@@ -10,12 +10,53 @@ if (missing.length > 0) {
   console.warn(`[env] Missing recommended environment variables: ${missing.join(', ')}`);
 }
 
+const isProduction = (process.env.NODE_ENV || 'development') === 'production';
+
+const clientUrls = String(process.env.CLIENT_URL || 'http://localhost:5173')
+  .split(',')
+  .map((url) => url.trim())
+  .filter(Boolean);
+
+/**
+ * Rebuilds mongodb+srv URIs so passwords with `@` still work after Vercel
+ * decodes `%40` → `@` (which otherwise breaks URI parsing).
+ */
+function normalizeMongoUri(uri) {
+  if (!uri || typeof uri !== 'string') return uri;
+
+  const trimmed = uri.trim().replace(/^["']|["']$/g, '');
+  const match = trimmed.match(/^(mongodb(?:\+srv)?:\/\/)(.+)$/i);
+  if (!match) return trimmed;
+
+  const protocol = match[1];
+  const rest = match[2];
+  const at = rest.lastIndexOf('@');
+  if (at <= 0) return trimmed;
+
+  const creds = rest.slice(0, at);
+  const hostAndMore = rest.slice(at + 1);
+  const colon = creds.indexOf(':');
+  if (colon <= 0) return trimmed;
+
+  const user = creds.slice(0, colon);
+  let password = creds.slice(colon + 1);
+  try {
+    password = decodeURIComponent(password);
+  } catch {
+    // keep as-is
+  }
+
+  return `${protocol}${encodeURIComponent(user)}:${encodeURIComponent(password)}@${hostAndMore}`;
+}
+
 const env = {
   nodeEnv: process.env.NODE_ENV || 'development',
   port: Number(process.env.PORT) || 5000,
-  clientUrl: process.env.CLIENT_URL || 'http://localhost:5173',
+  clientUrl: clientUrls[0],
+  clientUrls,
 
-  mongodbUri: process.env.MONGODB_URI,
+  mongodbUri: normalizeMongoUri(process.env.MONGODB_URI),
+  mongodbUriConfigured: Boolean(process.env.MONGODB_URI),
 
   jwt: {
     accessSecret: process.env.JWT_ACCESS_SECRET,
@@ -27,6 +68,11 @@ const env = {
   cookie: {
     secret: process.env.COOKIE_SECRET,
     refreshTokenName: process.env.REFRESH_TOKEN_COOKIE_NAME || 'refreshToken',
+    // Cross-site Vercel frontend ↔ backend needs SameSite=None + Secure
+    secure: process.env.COOKIE_SECURE
+      ? process.env.COOKIE_SECURE === 'true'
+      : isProduction,
+    sameSite: process.env.COOKIE_SAME_SITE || (isProduction ? 'none' : 'lax'),
   },
 
   cloudinary: {
