@@ -65,7 +65,7 @@ const createStation = [
 const stationTextFields = ['type', 'reasonForDelay', 'remarks'];
 const stationNumberFields = ['installationAmount', 'amountClaimed', 'amountCleared'];
 const stationDateFields = ['startDate', 'completionDate', 'commissioningDate', 'claimDate'];
-const stationJsonFields = ['sse', 'installer', 'supervisor', 'materials'];
+const stationJsonFields = ['sse', 'installer', 'supervisor', 'materials', 'claimRequests'];
 
 const updateStation = [
   param('id').isMongoId().withMessage('Invalid project id'),

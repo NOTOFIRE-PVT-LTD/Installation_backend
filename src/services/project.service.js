@@ -1,6 +1,7 @@
 const projectRepository = require('../repositories/project.repository');
 const userRepository = require('../repositories/user.repository');
 const uploadService = require('./upload.service');
+const whatsappNotificationService = require('./whatsappNotification.service');
 const ApiError = require('../utils/ApiError');
 const { buildPagination, buildSort, buildPaginatedResult } = require('../utils/pagination');
 const { CLAIM_STATUS, DEFAULT_BONUS_PERCENT, ROLES, USER_STATUS } = require('../config/constants');
@@ -388,10 +389,66 @@ async function addStation(projectId, data, files, actorId, user) {
 }
 
 const STATION_TEXT_FIELDS = ['name', 'type', 'reasonForDelay', 'remarks'];
-const STATION_NUMBER_FIELDS = ['installationAmount', 'amountClaimed', 'amountCleared'];
-const STATION_DATE_FIELDS = ['startDate', 'completionDate', 'commissioningDate', 'claimDate'];
+const STATION_NUMBER_FIELDS = ['installationAmount'];
+const STATION_DATE_FIELDS = ['startDate', 'completionDate', 'commissioningDate'];
 const STATION_JSON_FIELDS = ['sse', 'installer', 'supervisor', 'materials'];
 const TDS_PERCENT = 2;
+
+function normalizeClaimRequests(rawRequests = []) {
+  const list = Array.isArray(rawRequests) ? rawRequests : [];
+  return list
+    .map((entry) => {
+      const amountRequested = Math.max(0, Number(entry?.amountRequested) || 0);
+      const amountCleared = Math.max(0, Number(entry?.amountCleared) || 0);
+      const amountAfterTds = Math.round(amountRequested * (1 - TDS_PERCENT / 100));
+      return {
+        ...(entry?._id ? { _id: entry._id } : {}),
+        date: entry?.date || null,
+        amountRequested,
+        amountAfterTds,
+        amountCleared,
+        note: typeof entry?.note === 'string' ? entry.note.trim() : '',
+      };
+    })
+    .filter((entry) => entry.amountRequested > 0 || entry.amountCleared > 0 || entry.date || entry.note);
+}
+
+function syncClaimAggregates(station) {
+  const requests = Array.isArray(station.claimRequests) ? station.claimRequests : [];
+  const totalRequested = requests.reduce((sum, r) => sum + (Number(r.amountRequested) || 0), 0);
+  const totalAfterTds = requests.reduce((sum, r) => sum + (Number(r.amountAfterTds) || 0), 0);
+  const totalCleared = requests.reduce((sum, r) => sum + (Number(r.amountCleared) || 0), 0);
+
+  station.amountClaimed = totalRequested;
+  station.amountAfterTds = totalAfterTds;
+  station.amountCleared = totalCleared;
+
+  const dated = requests
+    .map((r) => r.date)
+    .filter(Boolean)
+    .map((d) => new Date(d))
+    .filter((d) => !Number.isNaN(d.getTime()))
+    .sort((a, b) => b - a);
+  station.claimDate = dated[0] || null;
+}
+
+function seedClaimRequestsFromLegacy(station) {
+  const existing = Array.isArray(station.claimRequests) ? station.claimRequests : [];
+  if (existing.length > 0) return;
+  const requested = Number(station.amountClaimed) || 0;
+  const cleared = Number(station.amountCleared) || 0;
+  if (!(requested > 0 || cleared > 0 || station.claimDate)) return;
+
+  station.claimRequests = [
+    {
+      date: station.claimDate || null,
+      amountRequested: requested,
+      amountAfterTds: Math.round(requested * (1 - TDS_PERCENT / 100)),
+      amountCleared: cleared,
+      note: '',
+    },
+  ];
+}
 
 function applyStationFields(station, data) {
   STATION_TEXT_FIELDS.forEach((field) => {
@@ -410,9 +467,38 @@ function applyStationFields(station, data) {
     }
   });
 
-  if (data.amountClaimed !== undefined || station.amountClaimed != null) {
+  if (data.claimRequests !== undefined) {
+    const parsed = parseJSONField(data.claimRequests);
+    station.claimRequests = normalizeClaimRequests(parsed);
+    syncClaimAggregates(station);
+
+    const allocated = Number(station.installationAmount) || 0;
     const requested = Number(station.amountClaimed) || 0;
-    station.amountAfterTds = Math.round(requested * (1 - TDS_PERCENT / 100));
+    if (allocated > 0 && requested > allocated) {
+      throw new ApiError(
+        400,
+        `Total amount requested (${requested}) cannot exceed installation amount allocated (${allocated})`
+      );
+    }
+  } else if (data.amountClaimed !== undefined || data.amountCleared !== undefined || data.claimDate !== undefined) {
+    // Backward-compatible single-field updates
+    if (data.amountClaimed !== undefined) station.amountClaimed = Number(data.amountClaimed) || 0;
+    if (data.amountCleared !== undefined) station.amountCleared = Number(data.amountCleared) || 0;
+    if (data.claimDate !== undefined) station.claimDate = data.claimDate || null;
+    station.amountAfterTds = Math.round((Number(station.amountClaimed) || 0) * (1 - TDS_PERCENT / 100));
+
+    if (!Array.isArray(station.claimRequests) || station.claimRequests.length === 0) {
+      seedClaimRequestsFromLegacy(station);
+    } else if (station.claimRequests.length === 1) {
+      station.claimRequests[0].amountRequested = Number(station.amountClaimed) || 0;
+      station.claimRequests[0].amountAfterTds = station.amountAfterTds;
+      station.claimRequests[0].amountCleared = Number(station.amountCleared) || 0;
+      if (data.claimDate !== undefined) station.claimRequests[0].date = data.claimDate || null;
+    }
+    syncClaimAggregates(station);
+  } else {
+    seedClaimRequestsFromLegacy(station);
+    syncClaimAggregates(station);
   }
 }
 
@@ -507,14 +593,34 @@ async function submitStationClaim(projectId, stationId, actorId, user) {
     throw new ApiError(400, 'Checklist upload, signed checklist, and work photos are mandatory before submitting a claim');
   }
   if (!(station.amountClaimed > 0)) {
-    throw new ApiError(400, 'Enter the amount claimed before submitting');
+    throw new ApiError(400, 'Enter at least one amount requested before submitting');
+  }
+
+  // Keep claimRequests in sync for older stations that only have aggregate fields
+  if (!Array.isArray(station.claimRequests) || station.claimRequests.length === 0) {
+    seedClaimRequestsFromLegacy(station);
+    syncClaimAggregates(station);
   }
 
   station.claimStatus = CLAIM_STATUS.PENDING_APPROVAL;
   project.updatedBy = actorId;
   await project.save();
 
-  return fetchProjectById(projectId);
+  const savedProject = await fetchProjectById(projectId);
+  const savedStation = savedProject.stations.id(stationId);
+
+  whatsappNotificationService
+    .notifyClaimSubmitted({
+      project: savedProject,
+      station: savedStation,
+      submittedBy: user,
+    })
+    .catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('[whatsapp] Claim notification error:', err.message);
+    });
+
+  return savedProject;
 }
 
 async function approveStationClaim(projectId, stationId, actorId) {

@@ -41,6 +41,17 @@ const additionalOfficerSchema = new Schema(
   { _id: false }
 );
 
+const claimRequestSchema = new Schema(
+  {
+    date: { type: Date, default: null },
+    amountRequested: { type: Number, default: 0, min: 0 },
+    amountAfterTds: { type: Number, default: 0, min: 0 },
+    amountCleared: { type: Number, default: 0, min: 0 },
+    note: { type: String, default: '', trim: true },
+  },
+  { timestamps: true }
+);
+
 const stationSchema = new Schema(
   {
     name: { type: String, required: true, trim: true },
@@ -59,9 +70,10 @@ const stationSchema = new Schema(
     cadDrawingFile: { type: mediaSchema, default: null },
     installationAmount: { type: Number, default: 0, min: 0 },
     claimDate: { type: Date, default: null },
-    amountClaimed: { type: Number, default: 0, min: 0 }, // Amount requested
-    amountAfterTds: { type: Number, default: 0, min: 0 }, // After 2% TDS deduction
+    amountClaimed: { type: Number, default: 0, min: 0 }, // Total amount requested (sum of claimRequests)
+    amountAfterTds: { type: Number, default: 0, min: 0 },
     amountCleared: { type: Number, default: 0, min: 0 },
+    claimRequests: { type: [claimRequestSchema], default: [] },
     claimStatus: { type: String, enum: Object.values(CLAIM_STATUS), default: CLAIM_STATUS.NOT_SUBMITTED },
     bonusEligible: { type: Boolean, default: false },
     bonusPercent: { type: Number, default: 0 },

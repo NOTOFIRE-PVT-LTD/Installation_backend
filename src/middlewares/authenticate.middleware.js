@@ -10,7 +10,7 @@ const authenticate = asyncHandler(async (req, res, next) => {
 
   if (!token) throw new ApiError(401, 'Authentication required');
 
-  let payload;  
+  let payload;
   try {
     payload = tokenService.verifyAccessToken(token);
   } catch (err) {

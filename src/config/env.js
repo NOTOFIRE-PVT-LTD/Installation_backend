@@ -108,6 +108,21 @@ const env = {
     password: process.env.SEED_ADMIN_PASSWORD || 'Admin@12345',
     mobileNumber: process.env.SEED_ADMIN_MOBILE || '9999999999',
   },
+
+  aisensy: {
+    enabled: process.env.AISENSY_ENABLED !== 'false',
+    apiKey: process.env.AISENSY_API_KEY || '',
+    campaignName: process.env.AISENSY_CAMPAIGN_NAME || '',
+    templateName: process.env.AISENSY_TEMPLATE_NAME || 'installation_payment',
+    // 'default' = 3 params (station, amount, remaining). 'extended' = 7 params for richer templates.
+    templateParamMode: process.env.AISENSY_TEMPLATE_PARAM_MODE || 'default',
+    source: process.env.AISENSY_SOURCE || 'NF Site Installation Report',
+    // station = auto-use signed checklist / checklist PDF on the station (default)
+    // signed_checklist | checklist | cad | env = force a specific source
+    mediaSource: process.env.AISENSY_MEDIA_SOURCE || 'station',
+    mediaUrl: process.env.AISENSY_MEDIA_URL || '',
+    mediaFilename: process.env.AISENSY_MEDIA_FILENAME || 'notification.pdf',
+  },
 };
 
 module.exports = env;

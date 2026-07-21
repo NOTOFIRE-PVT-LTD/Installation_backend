@@ -9,6 +9,7 @@ const numberDirectoryRoutes = require('./numberDirectory.routes');
 const divisionRoutes = require('./division.routes');
 const tenderRoutes = require('./tender.routes');
 const searchRoutes = require('./search.routes');
+const whatsappRoutes = require('./whatsapp.routes');
 
 const router = express.Router();
 
@@ -22,5 +23,6 @@ router.use('/numbers', numberDirectoryRoutes);
 router.use('/cad/divisions', divisionRoutes);
 router.use('/cad/tenders', tenderRoutes);
 router.use('/search', searchRoutes);
+router.use('/whatsapp', whatsappRoutes);
 
 module.exports = router;

@@ -14,7 +14,7 @@ router.use(authenticate);
 
 router.get('/', requirePermissionOrRole('projects', ROLES.USER), validate(projectValidator.list), projectController.list);
 router.get('/options', requirePermissionOrRole('projects', ROLES.USER), projectController.options);
-router.get('/approvals/queue', requireRole(ROLES.ADMIN), requirePermission('projects'), projectController.approvalsQueue);
+router.get('/approvals/queue', requireRole(ROLES.ADMIN), requirePermission('claimApprovals'), projectController.approvalsQueue);
 router.get('/:id', requirePermissionOrRole('projects', ROLES.USER), validate(projectValidator.idParam), projectController.getById);
 
 router.post(
@@ -71,21 +71,21 @@ router.post(
 router.post(
   '/:id/stations/:stationId/claim/approve',
   requireRole(ROLES.ADMIN),
-  requirePermission('projects'),
+  requirePermission('claimApprovals'),
   validate(projectValidator.stationIdParam),
   projectController.approveStationClaim
 );
 router.post(
   '/:id/stations/:stationId/claim/reject',
   requireRole(ROLES.ADMIN),
-  requirePermission('projects'),
+  requirePermission('claimApprovals'),
   validate(projectValidator.stationIdParam),
   projectController.rejectStationClaim
 );
 router.post(
   '/:id/stations/:stationId/claim/mark-paid',
   requireRole(ROLES.ADMIN),
-  requirePermission('projects'),
+  requirePermission('claimApprovals'),
   validate(projectValidator.stationIdParam),
   projectController.markStationPaid
 );

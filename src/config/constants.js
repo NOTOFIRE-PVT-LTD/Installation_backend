@@ -36,7 +36,16 @@ const SITE_TYPES = Object.freeze(['Station', 'IBH', 'Auto Hut', 'LC Gate', 'Tele
 
 const DEFAULT_BONUS_PERCENT = 5;
 
-const PERMISSION_KEYS = Object.freeze(['dashboard', 'users', 'projects', 'reports', 'payments', 'numbers', 'cadDrawing']);
+const PERMISSION_KEYS = Object.freeze([
+  'dashboard',
+  'users',
+  'projects',
+  'reports',
+  'payments',
+  'numbers',
+  'cadDrawing',
+  'claimApprovals',
+]);
 
 const NUMBER_CATEGORIES = Object.freeze({
   GOVERNMENT_OFFICIAL: 'Government Official',
