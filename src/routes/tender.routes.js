@@ -14,7 +14,7 @@ router.use(authenticate);
 
 router.get('/', requirePermissionOrRole('cadDrawing', ROLES.USER), validate(tenderValidator.list), tenderController.list);
 router.get('/:id', requirePermissionOrRole('cadDrawing', ROLES.USER), validate(tenderValidator.idParam), tenderController.getById);
-router.post('/', requireRole(ROLES.ADMIN), requirePermission('cadDrawing'), uploadTenderFiles, validate(tenderValidator.create), tenderController.create);
+router.post('/', requirePermissionOrRole('cadDrawing', ROLES.USER), uploadTenderFiles, validate(tenderValidator.create), tenderController.create);
 router.put('/:id', requireRole(ROLES.ADMIN), requirePermission('cadDrawing'), uploadTenderFiles, validate(tenderValidator.update), tenderController.update);
 router.delete('/:id', requireRole(ROLES.ADMIN), requirePermission('cadDrawing'), validate(tenderValidator.idParam), tenderController.remove);
 
