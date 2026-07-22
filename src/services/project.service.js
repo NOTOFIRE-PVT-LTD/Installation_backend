@@ -502,7 +502,17 @@ function applyStationFields(station, data) {
   }
 }
 
-async function updateStation(projectId, stationId, data, files, removePhotoIdsRaw, removeCadFileIdsRaw, actorId, user) {
+async function updateStation(
+  projectId,
+  stationId,
+  data,
+  files,
+  removePhotoIdsRaw,
+  removeCadFileIdsRaw,
+  removeCadDrawingFileRaw,
+  actorId,
+  user
+) {
   const project = await fetchProjectById(projectId);
   assertProjectAccess(project, user);
 
@@ -529,6 +539,16 @@ async function updateStation(projectId, stationId, data, files, removePhotoIdsRa
       toRemove.map((f) => uploadService.deleteAsset(f.publicId, f.resourceType === 'raw' ? 'raw' : 'image'))
     );
     station.cadDrawingFiles = (station.cadDrawingFiles || []).filter((f) => !removeCadIds.has(f.publicId));
+  }
+
+  const shouldRemoveCadDrawingFile =
+    String(removeCadDrawingFileRaw || '').toLowerCase() === 'true' || removeCadDrawingFileRaw === true;
+  if (shouldRemoveCadDrawingFile && station.cadDrawingFile?.publicId) {
+    const oldId = station.cadDrawingFile.publicId;
+    await uploadService.deleteAsset(oldId, 'image');
+    await uploadService.deleteAsset(oldId, 'raw');
+    station.set('cadDrawingFile', undefined);
+    station.markModified('cadDrawingFile');
   }
 
   const newCompleteFiles = files?.completePhotos || [];
@@ -582,6 +602,7 @@ async function updateStation(projectId, stationId, data, files, removePhotoIdsRa
   }
 
   project.updatedBy = actorId;
+  project.markModified('stations');
   await project.save();
 
   return fetchProjectById(projectId);
