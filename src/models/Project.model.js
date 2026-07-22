@@ -11,6 +11,16 @@ const mediaSchema = new Schema(
   { _id: false }
 );
 
+const cadFileSchema = new Schema(
+  {
+    url: { type: String, required: true },
+    publicId: { type: String, required: true },
+    resourceType: { type: String, enum: ['image', 'raw'], default: 'image' },
+    originalName: { type: String, default: '' },
+  },
+  { _id: false }
+);
+
 const dailyReportEntrySchema = new Schema(
   {
     photos: { type: [mediaSchema], default: [] },
@@ -67,7 +77,8 @@ const stationSchema = new Schema(
     checklistFile: { type: mediaSchema, default: null },
     checklistSignedFile: { type: mediaSchema, default: null },
     workPhotos: { type: [mediaSchema], default: [] },
-    cadDrawingFile: { type: mediaSchema, default: null },
+    cadDrawingFile: { type: mediaSchema, default: null }, // CAD Drawing Installer (single image)
+    cadDrawingFiles: { type: [cadFileSchema], default: [] }, // CAD File (multiple images / PDFs)
     installationAmount: { type: Number, default: 0, min: 0 },
     claimDate: { type: Date, default: null },
     amountClaimed: { type: Number, default: 0, min: 0 }, // Total amount requested (sum of claimRequests)

@@ -311,9 +311,9 @@ async function remove(id) {
   );
   await Promise.all(
     project.stations
-      .flatMap((s) => [s.checklistFile, s.checklistSignedFile, s.cadDrawingFile])
+      .flatMap((s) => [s.checklistFile, s.checklistSignedFile, s.cadDrawingFile, ...(s.cadDrawingFiles || [])])
       .filter((f) => f?.publicId)
-      .map((f) => uploadService.deleteAsset(f.publicId, 'raw'))
+      .map((f) => uploadService.deleteAsset(f.publicId, f.resourceType === 'image' ? 'image' : 'raw'))
   );
   await Promise.all(
     project.dailyReports.flatMap((r) => [
@@ -502,7 +502,7 @@ function applyStationFields(station, data) {
   }
 }
 
-async function updateStation(projectId, stationId, data, files, removePhotoIdsRaw, actorId, user) {
+async function updateStation(projectId, stationId, data, files, removePhotoIdsRaw, removeCadFileIdsRaw, actorId, user) {
   const project = await fetchProjectById(projectId);
   assertProjectAccess(project, user);
 
@@ -520,6 +520,15 @@ async function updateStation(projectId, stationId, data, files, removePhotoIdsRa
     station.completePhotos = station.completePhotos.filter((p) => !removeIds.has(p.publicId));
     station.remainingPhotos = station.remainingPhotos.filter((p) => !removeIds.has(p.publicId));
     station.workPhotos = station.workPhotos.filter((p) => !removeIds.has(p.publicId));
+  }
+
+  const removeCadIds = new Set(parseIdList(removeCadFileIdsRaw));
+  if (removeCadIds.size > 0) {
+    const toRemove = (station.cadDrawingFiles || []).filter((f) => removeCadIds.has(f.publicId));
+    await Promise.all(
+      toRemove.map((f) => uploadService.deleteAsset(f.publicId, f.resourceType === 'raw' ? 'raw' : 'image'))
+    );
+    station.cadDrawingFiles = (station.cadDrawingFiles || []).filter((f) => !removeCadIds.has(f.publicId));
   }
 
   const newCompleteFiles = files?.completePhotos || [];
@@ -564,6 +573,12 @@ async function updateStation(projectId, stationId, data, files, removePhotoIdsRa
       resourceType === 'raw'
         ? await uploadService.uploadDocumentBuffer(cadDrawingFile.buffer)
         : await uploadService.uploadImageBuffer(cadDrawingFile.buffer);
+  }
+
+  const newCadFiles = files?.cadDrawingFiles || [];
+  if (newCadFiles.length > 0) {
+    const uploaded = await Promise.all(newCadFiles.map((f) => uploadService.uploadCadFile(f)));
+    station.cadDrawingFiles = [...(station.cadDrawingFiles || []), ...uploaded];
   }
 
   project.updatedBy = actorId;
@@ -696,9 +711,9 @@ async function removeStation(projectId, stationId, user) {
     ])
   );
   await Promise.all(
-    [station.checklistFile, station.checklistSignedFile, station.cadDrawingFile]
+    [station.checklistFile, station.checklistSignedFile, station.cadDrawingFile, ...(station.cadDrawingFiles || [])]
       .filter((f) => f?.publicId)
-      .map((f) => uploadService.deleteAsset(f.publicId, 'raw'))
+      .map((f) => uploadService.deleteAsset(f.publicId, f.resourceType === 'image' ? 'image' : 'raw'))
   );
 
   station.deleteOne();

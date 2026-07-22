@@ -53,6 +53,7 @@ const updateStation = asyncHandler(async (req, res) => {
     req.body,
     req.files,
     req.body.removePhotoIds,
+    req.body.removeCadFileIds,
     req.user._id,
     req.user
   );

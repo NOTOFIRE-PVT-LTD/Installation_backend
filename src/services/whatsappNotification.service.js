@@ -46,7 +46,11 @@ function resolveStationPdfMedia(station) {
   const attachmentResolvers = {
     signed_checklist: () => fromFile(station.checklistSignedFile, 'signed-checklist'),
     checklist: () => fromFile(station.checklistFile, 'checklist'),
-    cad: () => fromFile(station.cadDrawingFile, 'cad-drawing'),
+    cad: () => {
+      const files = Array.isArray(station.cadDrawingFiles) ? station.cadDrawingFiles : [];
+      const pdf = files.find((f) => f.resourceType === 'raw' || isPdfUrl(f.url));
+      return fromFile(pdf, 'cad-file') || fromFile(station.cadDrawingFile, 'cad-drawing');
+    },
   };
 
   if (source !== 'station' && source !== 'env') {
@@ -60,7 +64,7 @@ function resolveStationPdfMedia(station) {
   return (
     fromFile(station.checklistSignedFile, 'signed-checklist') ||
     fromFile(station.checklistFile, 'checklist') ||
-    fromFile(station.cadDrawingFile, 'cad-drawing')
+    attachmentResolvers.cad()
   );
 }
 

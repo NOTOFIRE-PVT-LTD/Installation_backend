@@ -72,12 +72,13 @@ function mapTender(tender) {
   const divisionName = tender.division?.name;
   const zone = tender.division?.zone;
   const projectName = tender.project?.projectName;
+  const projectId = tender.project?._id || tender.project;
   return {
     type: 'tender',
     id: String(tender._id),
     title: tender.tenderName,
     subtitle: [divisionName, zone, projectName].filter(Boolean).join(' · '),
-    path: `/cad-drawing?search=${encodeURIComponent(tender.tenderName)}`,
+    path: projectId ? `/projects/${projectId}` : '/projects',
   };
 }
 
