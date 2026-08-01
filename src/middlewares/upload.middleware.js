@@ -7,7 +7,16 @@ const DOCUMENT_MIME_TYPES = ['application/pdf'];
 
 const VIDEO_FIELDS = ['siteVideo', 'commissioningVideos', 'videos'];
 const DOCUMENT_FIELDS = ['checklistPdf', 'installationInvoiceDoc', 'supplyInvoiceDoc', 'installationPoDoc', 'checklistFile', 'checklistSignedFile'];
-const MIXED_FIELDS = ['tenderFiles', 'cadDrawingFile', 'cadDrawingFiles'];
+const MIXED_FIELDS = [
+  'tenderFiles',
+  'cadDrawingFile',
+  'cadDrawingFiles',
+  'inspectionFiles',
+  'dmFile',
+  'icCopy',
+  'firmCallLetter',
+  'otherDetailsFiles',
+];
 const MIXED_MIME_TYPES = [...IMAGE_MIME_TYPES, ...DOCUMENT_MIME_TYPES];
 
 const storage = multer.memoryStorage();
@@ -74,6 +83,12 @@ const uploadSpreadsheet = multer({
 }).single('file');
 
 const uploadTenderFiles = upload.array('tenderFiles', 20);
+const uploadInspectionFiles = upload.fields([
+  { name: 'dmFile', maxCount: 1 },
+  { name: 'icCopy', maxCount: 1 },
+  { name: 'firmCallLetter', maxCount: 1 },
+  { name: 'otherDetailsFiles', maxCount: 20 },
+]);
 
 const uploadStationPhotos = upload.fields([
   { name: 'completePhotos', maxCount: 10 },
@@ -96,6 +111,7 @@ module.exports = {
   uploadProjectFiles,
   uploadSpreadsheet,
   uploadTenderFiles,
+  uploadInspectionFiles,
   uploadStationPhotos,
   uploadDailyReportPhotos: uploadDailyReportMedia,
   uploadDailyReportMedia,

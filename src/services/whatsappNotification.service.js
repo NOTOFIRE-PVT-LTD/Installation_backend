@@ -83,6 +83,154 @@ function resolveNotificationMedia(station) {
   return null;
 }
 
+async function findTenderNotificationAdmins() {
+  const admins = await User.find({
+    role: ROLES.ADMIN,
+    status: USER_STATUS.ACTIVE,
+  }).populate('permissions');
+
+  return admins.filter((admin) => {
+    if (!admin.permissions?.tenderWhatsappAlerts) return false;
+    const mobile = aisensyService.formatDestination(admin.mobileNumber);
+    return Boolean(mobile);
+  });
+}
+
+async function findBgDeadlineNotificationAdmins() {
+  const admins = await User.find({
+    role: ROLES.ADMIN,
+    status: USER_STATUS.ACTIVE,
+  }).populate('permissions');
+
+  return admins.filter((admin) => {
+    if (!admin.permissions?.bgWhatsappAlerts) return false;
+    const mobile = aisensyService.formatDestination(admin.mobileNumber);
+    return Boolean(mobile);
+  });
+}
+
+function formatDateForTemplate(value) {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const year = d.getUTCFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+function toYmdInTimeZone(date = new Date(), timeZone = 'Asia/Kolkata') {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
+
+function addCalendarDaysYmd(ymd, days) {
+  const [y, m, d] = String(ymd).split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + days);
+  return dt.toISOString().slice(0, 10);
+}
+
+function dateToYmdUtc(value) {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10);
+}
+
+async function notifyTenderCreated({ tender, submittedBy }) {
+  const eventType = 'tender_created';
+
+  const baseLog = {
+    eventType,
+    triggeredBy: submittedBy,
+  };
+
+  if (!tender) return;
+
+  if (!env.aisensy.enabled) {
+    logger.debug('[whatsapp] Skipped tender notification — Aisensy disabled');
+    await logWhatsAppAttempt({
+      ...baseLog,
+      recipient: null,
+      mobileNumber: 'N/A',
+      status: 'skipped',
+      message: 'WhatsApp notifications are disabled (AISENSY_ENABLED=false)',
+    });
+    return;
+  }
+
+  const admins = await findTenderNotificationAdmins();
+  if (admins.length === 0) {
+    logger.warn('[whatsapp] No admins with tenderWhatsappAlerts permission and valid mobile number to notify');
+    await logWhatsAppAttempt({
+      ...baseLog,
+      recipient: null,
+      mobileNumber: 'N/A',
+      status: 'skipped',
+      message:
+        'No admins configured for WhatsApp Tender alerts. Enable "Tender WhatsApp alerts" permission for at least one admin and add a valid mobile number.',
+    });
+    return;
+  }
+
+  const nitNumber = String(tender.nitNumber || '');
+  const loaNumber = String(tender.loaNumber || '');
+  const contractorName = String(tender.contractorName || '');
+  // Log summary only — AiSensy template `tender_doc` is static text with no params/media.
+  const summary = `Tender ${nitNumber} completed. LOA: ${loaNumber || '-'} · Contractor: ${contractorName || '-'}`;
+
+  await Promise.all(
+    admins.map(async (admin) => {
+      try {
+        const providerResponse = await aisensyService.sendCampaignMessage({
+          destination: admin.mobileNumber,
+          userName: admin.name,
+          templateParams: [],
+          campaignName: 'tender_document',
+          templateName: 'tender_doc',
+          allowEnvMediaFallback: false,
+        });
+
+        if (providerResponse?.skipped) {
+          await logWhatsAppAttempt({
+            ...baseLog,
+            recipient: admin,
+            mobileNumber: admin.mobileNumber,
+            status: 'skipped',
+            message: summary,
+            providerResponse,
+          });
+          return;
+        }
+
+        await logWhatsAppAttempt({
+          ...baseLog,
+          recipient: admin,
+          mobileNumber: admin.mobileNumber,
+          status: 'sent',
+          message: summary,
+          providerResponse,
+        });
+      } catch (err) {
+        await logWhatsAppAttempt({
+          ...baseLog,
+          recipient: admin,
+          mobileNumber: admin.mobileNumber,
+          status: 'failed',
+          message: summary,
+          error: err.message,
+        });
+        logger.error(`[whatsapp] Failed to notify ${admin.email}:`, err.message);
+      }
+    })
+  );
+}
+
 async function findClaimApprovalAdmins() {
   const admins = await User.find({
     role: ROLES.ADMIN,
@@ -271,4 +419,130 @@ async function notifyClaimSubmitted({ project, station, submittedBy }) {
   );
 }
 
-module.exports = { notifyClaimSubmitted, findClaimApprovalAdmins, resolveNotificationMedia };
+/**
+ * Sends BG deadline reminders for Financial Documents whose LOA Date was exactly 14 days ago.
+ * Template: bg_deadline
+ * Campaign: bg_deadline_camp
+ * {{1}} Tender Name | {{2}} BG Deadline (LOA Date + 21 days)
+ */
+async function notifyBgDeadlineReminders() {
+  const eventType = 'bg_deadline_reminder';
+  const FinancialDocument = require('../models/FinancialDocument.model');
+
+  if (!env.aisensy.enabled) {
+    logger.debug('[whatsapp] Skipped BG deadline reminders — Aisensy disabled');
+    return { processed: 0, sent: 0, skipped: true };
+  }
+
+  const todayYmd = toYmdInTimeZone(new Date(), 'Asia/Kolkata');
+  const targetLoaYmd = addCalendarDaysYmd(todayYmd, -14);
+
+  const candidates = await FinancialDocument.find({
+    loaDate: { $ne: null },
+    bgReminder14SentAt: null,
+    bgSubmission: null,
+  }).lean();
+
+  const dueDocs = candidates.filter((doc) => dateToYmdUtc(doc.loaDate) === targetLoaYmd);
+  if (dueDocs.length === 0) {
+    logger.debug(`[whatsapp] No BG deadline reminders due for LOA date ${targetLoaYmd}`);
+    return { processed: 0, sent: 0 };
+  }
+
+  const admins = await findBgDeadlineNotificationAdmins();
+  if (admins.length === 0) {
+    logger.warn('[whatsapp] No admins with bgWhatsappAlerts permission and valid mobile number');
+    await logWhatsAppAttempt({
+      eventType,
+      recipient: null,
+      mobileNumber: 'N/A',
+      status: 'skipped',
+      message:
+        'No admins configured for BG Deadline WhatsApp alerts. Enable "BG Deadline WhatsApp alerts" and add a valid mobile number.',
+    });
+    return { processed: dueDocs.length, sent: 0, skipped: true };
+  }
+
+  let sent = 0;
+
+  for (const doc of dueDocs) {
+    const tenderName = String(doc.tenderName || doc.loaNumber || 'Tender').trim() || 'Tender';
+    const deadlineDate = doc.bgDeadline21 || (() => {
+      if (!doc.loaDate) return null;
+      const d = new Date(doc.loaDate);
+      d.setUTCDate(d.getUTCDate() + 21);
+      return d;
+    })();
+    const deadlineStr = formatDateForTemplate(deadlineDate) || '-';
+    const templateParams = [tenderName, deadlineStr];
+    const summary = `BG reminder for ${tenderName} — submit by ${deadlineStr} (LOA + 14 day alert)`;
+
+    let anySent = false;
+
+    await Promise.all(
+      admins.map(async (admin) => {
+        try {
+          const providerResponse = await aisensyService.sendCampaignMessage({
+            destination: admin.mobileNumber,
+            userName: admin.name,
+            templateParams,
+            campaignName: 'bg_deadline_camp',
+            templateName: 'bg_deadline',
+            allowEnvMediaFallback: false,
+          });
+
+          if (providerResponse?.skipped) {
+            await logWhatsAppAttempt({
+              eventType,
+              recipient: admin,
+              mobileNumber: admin.mobileNumber,
+              status: 'skipped',
+              message: summary,
+              providerResponse,
+            });
+            return;
+          }
+
+          anySent = true;
+          sent += 1;
+          await logWhatsAppAttempt({
+            eventType,
+            recipient: admin,
+            mobileNumber: admin.mobileNumber,
+            status: 'sent',
+            message: summary,
+            providerResponse,
+          });
+        } catch (err) {
+          await logWhatsAppAttempt({
+            eventType,
+            recipient: admin,
+            mobileNumber: admin.mobileNumber,
+            status: 'failed',
+            message: summary,
+            error: err.message,
+          });
+          logger.error(`[whatsapp] BG reminder failed for ${admin.email}:`, err.message);
+        }
+      })
+    );
+
+    // Mark as sent when at least one recipient succeeded so we don't spam daily.
+    // If all failed, leave null so the next hourly run can retry.
+    if (anySent) {
+      await FinancialDocument.updateOne({ _id: doc._id }, { $set: { bgReminder14SentAt: new Date() } });
+    }
+  }
+
+  logger.info(`[whatsapp] BG deadline reminders processed=${dueDocs.length} sent=${sent} for LOA ${targetLoaYmd}`);
+  return { processed: dueDocs.length, sent };
+}
+
+module.exports = {
+  notifyClaimSubmitted,
+  findClaimApprovalAdmins,
+  resolveNotificationMedia,
+  notifyTenderCreated,
+  notifyBgDeadlineReminders,
+  findBgDeadlineNotificationAdmins,
+};

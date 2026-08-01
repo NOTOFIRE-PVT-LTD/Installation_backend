@@ -45,7 +45,24 @@ const PERMISSION_KEYS = Object.freeze([
   'numbers',
   'cadDrawing',
   'claimApprovals',
+  'tenders',
+  'tenderWhatsappAlerts',
+  'inspections',
+  'financialDocuments',
+  'bgWhatsappAlerts',
 ]);
+
+const INSPECTION_STATUS = Object.freeze({
+  PENDING: 'Pending',
+  IN_PROGRESS: 'In Progress',
+  PASSED: 'Passed',
+  FAILED: 'Failed',
+});
+
+const LOA_TYPES = Object.freeze({
+  NOTOFIRE: 'Notofire',
+  THIRD_PARTY: 'Third Party',
+});
 
 const NUMBER_CATEGORIES = Object.freeze({
   GOVERNMENT_OFFICIAL: 'Government Official',
@@ -63,5 +80,7 @@ module.exports = {
   SITE_TYPES,
   DEFAULT_BONUS_PERCENT,
   PERMISSION_KEYS,
+  INSPECTION_STATUS,
+  LOA_TYPES,
   NUMBER_CATEGORIES,
 };

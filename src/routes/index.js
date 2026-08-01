@@ -10,6 +10,11 @@ const divisionRoutes = require('./division.routes');
 const tenderRoutes = require('./tender.routes');
 const searchRoutes = require('./search.routes');
 const whatsappRoutes = require('./whatsapp.routes');
+const nitTenderRoutes = require('./nitTender.routes');
+const inspectionRoutes = require('./inspection.routes');
+const financialDocumentRoutes = require('./financialDocument.routes');
+const contractAgreementRoutes = require('./contractAgreement.routes');
+const callLetterRoutes = require('./callLetter.routes');
 
 const router = express.Router();
 
@@ -24,5 +29,10 @@ router.use('/cad/divisions', divisionRoutes);
 router.use('/cad/tenders', tenderRoutes);
 router.use('/search', searchRoutes);
 router.use('/whatsapp', whatsappRoutes);
+router.use('/nit-tenders', nitTenderRoutes);
+router.use('/inspections', inspectionRoutes);
+router.use('/financial-documents', financialDocumentRoutes);
+router.use('/contract-agreements', contractAgreementRoutes);
+router.use('/call-letters', callLetterRoutes);
 
 module.exports = router;

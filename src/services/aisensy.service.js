@@ -18,11 +18,25 @@ function buildMediaPayload(media) {
   };
 }
 
-async function sendCampaignMessage({ destination, userName, templateParams = [], source, media }) {
+async function sendCampaignMessage({
+  destination,
+  userName,
+  templateParams = [],
+  source,
+  media,
+  campaignName,
+  templateName,
+  // Text-only campaigns (e.g. tender_doc) must not inherit AISENSY_MEDIA_URL.
+  allowEnvMediaFallback = true,
+}) {
   if (!env.aisensy.enabled) {
     return { skipped: true, reason: 'Aisensy is disabled' };
   }
-  if (!env.aisensy.apiKey || !env.aisensy.campaignName) {
+
+  const resolvedCampaignName = campaignName || env.aisensy.campaignName;
+  const resolvedTemplateName = templateName || env.aisensy.templateName;
+
+  if (!env.aisensy.apiKey || !resolvedCampaignName) {
     throw new Error('Aisensy API key or campaign name is not configured');
   }
 
@@ -33,7 +47,8 @@ async function sendCampaignMessage({ destination, userName, templateParams = [],
 
   const payload = {
     apiKey: env.aisensy.apiKey,
-    campaignName: env.aisensy.campaignName,
+    campaignName: resolvedCampaignName,
+    templateName: resolvedTemplateName,
     destination: formattedDestination,
     userName: userName || 'Admin',
     source: source || env.aisensy.source,
@@ -42,7 +57,7 @@ async function sendCampaignMessage({ destination, userName, templateParams = [],
 
   const mediaPayload =
     buildMediaPayload(media) ||
-    (env.aisensy.mediaUrl
+    (allowEnvMediaFallback && env.aisensy.mediaUrl
       ? buildMediaPayload({ url: env.aisensy.mediaUrl, filename: env.aisensy.mediaFilename })
       : null);
 
