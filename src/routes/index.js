@@ -15,6 +15,7 @@ const inspectionRoutes = require('./inspection.routes');
 const financialDocumentRoutes = require('./financialDocument.routes');
 const contractAgreementRoutes = require('./contractAgreement.routes');
 const callLetterRoutes = require('./callLetter.routes');
+const bgApplicationRoutes = require('./bgApplication.routes');
 
 const router = express.Router();
 
@@ -34,5 +35,6 @@ router.use('/inspections', inspectionRoutes);
 router.use('/financial-documents', financialDocumentRoutes);
 router.use('/contract-agreements', contractAgreementRoutes);
 router.use('/call-letters', callLetterRoutes);
+router.use('/bg-applications', bgApplicationRoutes);
 
 module.exports = router;
