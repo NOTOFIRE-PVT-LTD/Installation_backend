@@ -50,6 +50,7 @@ const PERMISSION_KEYS = Object.freeze([
   'inspections',
   'financialDocuments',
   'bgWhatsappAlerts',
+  'accounts',
 ]);
 
 const INSPECTION_STATUS = Object.freeze({

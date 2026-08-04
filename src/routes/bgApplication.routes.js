@@ -9,7 +9,7 @@ const { ROLES } = require('../config/constants');
 
 const router = express.Router();
 
-router.use(authenticate, requireRole(ROLES.ADMIN), requirePermission('financialDocuments'));
+router.use(authenticate, requireRole(ROLES.ADMIN), requirePermission('accounts'));
 
 router.get('/', validate(bgApplicationValidator.list), bgApplicationController.list);
 router.get('/:id', validate(bgApplicationValidator.idParam), bgApplicationController.getById);
