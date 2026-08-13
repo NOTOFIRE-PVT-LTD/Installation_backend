@@ -17,6 +17,7 @@ const contractAgreementRoutes = require('./contractAgreement.routes');
 const callLetterRoutes = require('./callLetter.routes');
 const bgApplicationRoutes = require('./bgApplication.routes');
 const stockRoutes = require('./stock.routes');
+const bomRoutes = require('./bom.routes');
 
 const router = express.Router();
 
@@ -38,5 +39,6 @@ router.use('/contract-agreements', contractAgreementRoutes);
 router.use('/call-letters', callLetterRoutes);
 router.use('/bg-applications', bgApplicationRoutes);
 router.use('/stock', stockRoutes);
+router.use('/bom', bomRoutes);
 
 module.exports = router;

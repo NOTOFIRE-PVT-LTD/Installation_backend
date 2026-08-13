@@ -255,12 +255,13 @@ async function getBalances(stockItemId) {
     }
   });
 
-  const warehouseQty = inbound + returned - issued;
+  // Without a separate Issue step: warehouse depletes on Utilize, and returns restore stock.
+  const warehouseQty = inbound + returned - utilized;
   const personQtys = {};
   byPerson.forEach((val, key) => {
     personQtys[key] = {
       name: val.name,
-      holding: Math.max(0, val.issued - val.utilized - val.returned),
+      holding: Math.max(0, val.utilized - val.returned),
       issued: val.issued,
       utilized: val.utilized,
       returned: val.returned,
@@ -455,7 +456,13 @@ async function createMovement(data, actorId) {
     }
   }
 
-  if (type === UTILIZE || type === RETURN_IN) {
+  if (type === UTILIZE) {
+    if (quantity > balances.warehouseQty) {
+      throw new ApiError(400, `Not enough warehouse stock. Available: ${balances.warehouseQty} ${item.unit}`);
+    }
+  }
+
+  if (type === RETURN_IN) {
     if (!issuedTo) throw new ApiError(400, 'Person name is required');
     const holding = balances.personQtys[personKey(issuedTo)]?.holding || 0;
     if (quantity > holding) {
@@ -473,7 +480,7 @@ async function createMovement(data, actorId) {
     amount: type === SUPPLIER_IN ? movementAmount : 0,
     movementDate: data.movementDate || new Date(),
     supplierName: type === SUPPLIER_IN ? String(data.supplierName || '').trim() : '',
-    issuedTo: type === SUPPLIER_IN ? '' : issuedTo,
+    issuedTo: type === SUPPLIER_IN || type === UTILIZE ? '' : issuedTo,
     referenceNo: String(data.referenceNo || '').trim(),
     remarks: String(data.remarks || '').trim(),
     createdBy: actorId,
@@ -498,11 +505,21 @@ async function removeMovement(id) {
   const amount = qty(movement.quantity);
 
   if (movement.type === SUPPLIER_IN && amount > balances.warehouseQty) {
-    throw new ApiError(400, 'Cannot delete this receipt — warehouse stock has already been issued');
+    throw new ApiError(400, 'Cannot delete this receipt — warehouse stock has already been utilized');
   }
 
   if (movement.type === RETURN_IN && amount > balances.warehouseQty) {
-    throw new ApiError(400, 'Cannot delete this return — warehouse stock has already been re-issued');
+    throw new ApiError(400, 'Cannot delete this return — warehouse stock has already been re-utilized');
+  }
+
+  if (movement.type === UTILIZE) {
+    // Manual utilize has no person assignment. BOM utilizes may still have issuedTo.
+    if (movement.issuedTo) {
+      const holding = balances.personQtys[personKey(movement.issuedTo)]?.holding || 0;
+      if (amount > holding) {
+        throw new ApiError(400, 'Cannot delete this utilize — that person has already returned part of it');
+      }
+    }
   }
 
   if (movement.type === ISSUE_OUT) {
@@ -596,18 +613,68 @@ async function warehouseSummary() {
     issued: entry.issued,
     utilized: entry.utilized,
     returned: entry.returned,
-    warehouseQty: entry.inbound + entry.returned - entry.issued,
+    warehouseQty: entry.inbound + entry.returned - entry.utilized,
     people: Array.from(entry.people.values())
       .map((p) => ({
         name: p.name,
         issued: p.issued,
         utilized: p.utilized,
         returned: p.returned,
-        holding: Math.max(0, p.issued - p.utilized - p.returned),
+        holding: Math.max(0, p.utilized - p.returned),
       }))
-      .filter((p) => p.issued > 0 || p.holding > 0 || p.utilized > 0)
+      .filter((p) => p.holding > 0 || p.utilized > 0 || p.returned > 0)
       .sort((a, b) => a.name.localeCompare(b.name)),
   }));
+}
+
+/**
+ * Create multiple UTILIZE movements atomically (used by BOM production).
+ * Each line: { stockItem, quantity, issuedTo, movementDate?, referenceNo?, remarks? }
+ */
+async function createUtilizeBatch(lines, actorId, { session } = {}) {
+  if (!Array.isArray(lines) || lines.length === 0) {
+    throw new ApiError(400, 'At least one utilize line is required');
+  }
+
+  const docs = [];
+  for (const line of lines) {
+    const item = await stockItemRepository.findById(line.stockItem);
+    if (!item) throw new ApiError(404, `Stock item not found: ${line.stockItem}`);
+
+    const quantity = qty(line.quantity);
+    if (quantity <= 0) throw new ApiError(400, `Invalid quantity for ${item.name}`);
+
+    const issuedTo = String(line.issuedTo || '').trim();
+    if (!issuedTo) throw new ApiError(400, 'Person name is required');
+
+    const balances = await getBalances(item._id);
+    if (quantity > balances.warehouseQty) {
+      throw new ApiError(
+        400,
+        `Not enough warehouse stock for ${item.name}. Available: ${balances.warehouseQty} ${item.unit || 'Nos'}, required: ${quantity}`
+      );
+    }
+
+    docs.push({
+      type: UTILIZE,
+      stockItem: item._id,
+      quantity,
+      amount: 0,
+      movementDate: line.movementDate || new Date(),
+      supplierName: '',
+      issuedTo,
+      referenceNo: String(line.referenceNo || '').trim(),
+      remarks: String(line.remarks || '').trim(),
+      createdBy: actorId,
+      updatedBy: actorId,
+    });
+  }
+
+  const created = session
+    ? await StockMovement.create(docs, { session, ordered: true })
+    : await StockMovement.insertMany(docs, { ordered: true });
+
+  return created;
 }
 
 module.exports = {
@@ -622,6 +689,8 @@ module.exports = {
   listMovements,
   getMovementById,
   createMovement,
+  createUtilizeBatch,
   removeMovement,
   warehouseSummary,
+  getBalances,
 };

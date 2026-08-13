@@ -52,6 +52,7 @@ const PERMISSION_KEYS = Object.freeze([
   'bgWhatsappAlerts',
   'accounts',
   'stockItems',
+  'bom',
 ]);
 
 const STOCK_MOVEMENT_TYPES = Object.freeze({
@@ -59,6 +60,11 @@ const STOCK_MOVEMENT_TYPES = Object.freeze({
   ISSUE_OUT: 'issue_out',
   UTILIZE: 'utilize',
   RETURN_IN: 'return_in',
+});
+
+const BOM_TYPES = Object.freeze({
+  STANDARD: 'Standard',
+  ROUTE: 'Route BOM',
 });
 
 const STOCK_CATALOG_KINDS = Object.freeze({
@@ -164,4 +170,5 @@ module.exports = {
   STOCK_CATALOG_KINDS,
   STOCK_ITEM_TYPES,
   DEFAULT_STOCK_COMPONENT_NAMES,
+  BOM_TYPES,
 };
