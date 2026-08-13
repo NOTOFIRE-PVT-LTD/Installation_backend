@@ -16,6 +16,7 @@ const MIXED_FIELDS = [
   'icCopy',
   'firmCallLetter',
   'otherDetailsFiles',
+  'docs',
 ];
 const MIXED_MIME_TYPES = [...IMAGE_MIME_TYPES, ...DOCUMENT_MIME_TYPES];
 
@@ -105,6 +106,8 @@ const uploadDailyReportMedia = upload.fields([
   { name: 'videos', maxCount: 5 },
 ]);
 
+const uploadStockItemFiles = upload.fields([{ name: 'docs', maxCount: 20 }]);
+
 module.exports = {
   uploadReportFiles,
   uploadProfileImage,
@@ -115,4 +118,5 @@ module.exports = {
   uploadStationPhotos,
   uploadDailyReportPhotos: uploadDailyReportMedia,
   uploadDailyReportMedia,
+  uploadStockItemFiles,
 };
