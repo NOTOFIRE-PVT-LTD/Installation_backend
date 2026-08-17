@@ -57,6 +57,11 @@ const createMovement = asyncHandler(async (req, res) => {
   sendSuccess(res, { statusCode: 201, message: 'Stock movement recorded', data: movement });
 });
 
+const updateMovement = asyncHandler(async (req, res) => {
+  const movement = await stockService.updateMovement(req.params.id, req.body, req.user._id);
+  sendSuccess(res, { message: 'Stock movement updated', data: movement });
+});
+
 const removeMovement = asyncHandler(async (req, res) => {
   await stockService.removeMovement(req.params.id);
   sendSuccess(res, { message: 'Stock movement deleted' });
@@ -74,5 +79,6 @@ module.exports = {
   removeItem,
   listMovements,
   createMovement,
+  updateMovement,
   removeMovement,
 };

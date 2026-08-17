@@ -155,19 +155,26 @@ async function resolveItemCatalog(data, actorId) {
     actorId,
     label: 'component name',
   });
-  const subComponent = await resolveCatalogEntry({
-    kind: STOCK_CATALOG_KINDS.SUB_COMPONENT,
-    id: data.subComponent,
-    otherName: data.newSubComponent || data.subComponentName,
-    parent: component._id,
-    actorId,
-    label: 'sub component name',
-  });
+  // Sub component is optional — the item then belongs directly to the component.
+  const subComponentName = data.newSubComponent || data.subComponentName;
+  const hasSubComponent = isOther(data.subComponent)
+    ? Boolean(String(subComponentName || '').trim())
+    : true;
+  const subComponent = hasSubComponent
+    ? await resolveCatalogEntry({
+        kind: STOCK_CATALOG_KINDS.SUB_COMPONENT,
+        id: data.subComponent,
+        otherName: subComponentName,
+        parent: component._id,
+        actorId,
+        label: 'sub component name',
+      })
+    : null;
   return { category, component, subComponent };
 }
 
 function buildItemName({ category, component, subComponent }) {
-  return subComponent.name || component.name || category.name;
+  return subComponent?.name || component.name || category.name;
 }
 
 async function uploadDocs(files = []) {
@@ -189,7 +196,7 @@ function parseRemoveDocIds(value) {
 }
 
 const MOVEMENT_POPULATE = [
-  { path: 'stockItem', select: 'name sku unit' },
+  { path: 'stockItem', select: 'name sku unit categoryName componentName subComponentName' },
   { path: 'createdBy', select: 'name email' },
 ];
 
@@ -205,10 +212,16 @@ function personKey(name) {
     .toLowerCase();
 }
 
-async function getBalances(stockItemId) {
+// `excludeMovementId` lets an edit validate against balances as they would be
+// without the movement being edited.
+async function getBalances(stockItemId, { excludeMovementId } = {}) {
   const itemObjectId = new mongoose.Types.ObjectId(String(stockItemId));
+  const match = { stockItem: itemObjectId };
+  if (excludeMovementId) {
+    match._id = { $ne: new mongoose.Types.ObjectId(String(excludeMovementId)) };
+  }
   const rows = await StockMovement.aggregate([
-    { $match: { stockItem: itemObjectId } },
+    { $match: match },
     {
       $group: {
         _id: { type: '$type', issuedTo: '$issuedTo' },
@@ -320,10 +333,10 @@ async function createItem(data, files, actorId) {
   const created = await stockItemRepository.create({
     category: category._id,
     component: component._id,
-    subComponent: subComponent._id,
+    subComponent: subComponent?._id || null,
     categoryName: category.name,
     componentName: component.name,
-    subComponentName: subComponent.name,
+    subComponentName: subComponent?.name || '',
     name: buildItemName({ category, component, subComponent }),
     sku: String(data.sku || '').trim(),
     unit: String(data.unit || 'Nos').trim() || 'Nos',
@@ -358,10 +371,10 @@ async function updateItem(id, data, files, actorId) {
   await stockItemRepository.updateById(id, {
     category: category._id,
     component: component._id,
-    subComponent: subComponent._id,
+    subComponent: subComponent?._id || null,
     categoryName: category.name,
     componentName: component.name,
-    subComponentName: subComponent.name,
+    subComponentName: subComponent?.name || '',
     name: buildItemName({ category, component, subComponent }),
     sku: data.sku !== undefined ? String(data.sku || '').trim() : existing.sku,
     unit: String(data.unit || existing.unit || 'Nos').trim() || 'Nos',
@@ -497,6 +510,94 @@ async function createMovement(data, actorId) {
   return getMovementById(created._id);
 }
 
+async function updateMovement(id, data, actorId) {
+  const existing = await stockMovementRepository.findById(id);
+  if (!existing) throw new ApiError(404, 'Stock movement not found');
+
+  const type = existing.type;
+  const item = await stockItemRepository.findById(
+    data.stockItem !== undefined && data.stockItem ? data.stockItem : existing.stockItem
+  );
+  if (!item) throw new ApiError(404, 'Stock item not found');
+
+  const quantity = data.quantity !== undefined ? qty(data.quantity) : qty(existing.quantity);
+  if (quantity <= 0) throw new ApiError(400, 'Quantity must be greater than 0');
+
+  const issuedTo =
+    data.issuedTo !== undefined ? String(data.issuedTo || '').trim() : String(existing.issuedTo || '').trim();
+  const supplierName =
+    data.supplierName !== undefined
+      ? String(data.supplierName || '').trim()
+      : String(existing.supplierName || '').trim();
+
+  if (type === SUPPLIER_IN && !supplierName) throw new ApiError(400, 'Supplier name is required');
+  if ((type === ISSUE_OUT || type === RETURN_IN) && !issuedTo) {
+    throw new ApiError(400, 'Person name is required');
+  }
+
+  const movementAmount = data.amount !== undefined ? qty(data.amount) : qty(existing.amount);
+  if (type !== SUPPLIER_IN && movementAmount > 0) {
+    throw new ApiError(400, 'Amount is only allowed for supplier receipts');
+  }
+
+  // Balances as they would be if this movement did not exist.
+  const balances = await getBalances(item._id, { excludeMovementId: existing._id });
+
+  if (type === SUPPLIER_IN && balances.warehouseQty + quantity < 0) {
+    throw new ApiError(
+      400,
+      `Cannot reduce this receipt to ${quantity} — ${Math.abs(balances.warehouseQty)} ${item.unit} has already been utilized`
+    );
+  }
+
+  if ((type === ISSUE_OUT || type === UTILIZE) && quantity > balances.warehouseQty) {
+    throw new ApiError(400, `Not enough warehouse stock. Available: ${balances.warehouseQty} ${item.unit}`);
+  }
+
+  if (type === RETURN_IN) {
+    const holding = balances.personQtys[personKey(issuedTo)]?.holding || 0;
+    if (quantity > holding) {
+      throw new ApiError(400, `Not enough stock with ${issuedTo}. Holding: ${holding} ${item.unit}`);
+    }
+  }
+
+  await stockMovementRepository.updateById(id, {
+    stockItem: item._id,
+    quantity,
+    amount: type === SUPPLIER_IN ? movementAmount : 0,
+    movementDate: data.movementDate || existing.movementDate,
+    supplierName: type === SUPPLIER_IN ? supplierName : '',
+    issuedTo: type === SUPPLIER_IN || type === UTILIZE ? '' : issuedTo,
+    referenceNo: data.referenceNo !== undefined ? String(data.referenceNo || '').trim() : existing.referenceNo,
+    remarks: data.remarks !== undefined ? String(data.remarks || '').trim() : existing.remarks,
+    updatedBy: actorId,
+  });
+
+  if (type === SUPPLIER_IN) {
+    await rollbackReceiptTotals(existing);
+    const target = await stockItemRepository.findById(item._id);
+    if (target) {
+      await stockItemRepository.updateById(target._id, {
+        quantity: qty(target.quantity) + quantity,
+        amount: qty(target.amount) + movementAmount,
+      });
+    }
+  }
+
+  return getMovementById(id);
+}
+
+// Supplier receipts are also rolled up on the item itself, so any change has to
+// undo the original contribution first.
+async function rollbackReceiptTotals(movement) {
+  const item = await stockItemRepository.findById(movement.stockItem);
+  if (!item) return;
+  await stockItemRepository.updateById(item._id, {
+    quantity: Math.max(0, qty(item.quantity) - qty(movement.quantity)),
+    amount: Math.max(0, qty(item.amount) - qty(movement.amount)),
+  });
+}
+
 async function removeMovement(id) {
   const movement = await stockMovementRepository.findById(id);
   if (!movement) throw new ApiError(404, 'Stock movement not found');
@@ -530,13 +631,7 @@ async function removeMovement(id) {
   }
 
   if (movement.type === SUPPLIER_IN) {
-    const item = await stockItemRepository.findById(movement.stockItem);
-    if (item) {
-      await stockItemRepository.updateById(item._id, {
-        quantity: Math.max(0, qty(item.quantity) - amount),
-        amount: Math.max(0, qty(item.amount) - qty(movement.amount)),
-      });
-    }
+    await rollbackReceiptTotals(movement);
   }
 
   await stockMovementRepository.deleteById(id);
@@ -689,6 +784,7 @@ module.exports = {
   listMovements,
   getMovementById,
   createMovement,
+  updateMovement,
   createUtilizeBatch,
   removeMovement,
   warehouseSummary,

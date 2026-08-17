@@ -6,9 +6,8 @@ const stockService = require('./stock.service');
 const BomProduction = require('../models/BomProduction.model');
 const ApiError = require('../utils/ApiError');
 const { buildPagination, buildSort, buildPaginatedResult } = require('../utils/pagination');
-const { BOM_TYPES } = require('../config/constants');
 
-const BOM_SORT = ['name', 'version', 'bomType', 'effectiveDate', 'isActive', 'createdAt'];
+const BOM_SORT = ['name', 'version', 'effectiveDate', 'isActive', 'createdAt'];
 const PRODUCTION_SORT = ['productionDate', 'productionQty', 'person', 'createdAt'];
 
 const BOM_POPULATE = [
@@ -19,7 +18,7 @@ const BOM_POPULATE = [
 ];
 
 const PRODUCTION_POPULATE = [
-  { path: 'bom', select: 'name version bomType' },
+  { path: 'bom', select: 'name version' },
   { path: 'lines.stockItem', select: 'name sku unit' },
   { path: 'movements', select: 'type quantity stockItem issuedTo movementDate' },
   { path: 'createdBy', select: 'name email' },
@@ -49,12 +48,7 @@ async function normalizeComponents(components = []) {
     if (qtyPerPcs <= 0) throw new ApiError(400, `Qty required for 1 PCS must be greater than 0 for ${item.name}`);
     normalized.push({
       stockItem: item._id,
-      partNo: String(row.partNo || item.sku || '').trim(),
-      package: String(row.package || '').trim(),
-      vendor: String(row.vendor || '').trim(),
       qtyPerPcs,
-      unit: String(row.unit || item.unit || 'Nos').trim() || 'Nos',
-      remarks: String(row.remarks || '').trim(),
     });
   }
   return normalized;
@@ -64,7 +58,6 @@ async function listBoms(query) {
   const { page, pageSize, skip } = buildPagination(query);
   const sort = buildSort(query, BOM_SORT);
   const filter = {};
-  if (query.bomType) filter.bomType = query.bomType;
   if (query.isActive === 'true') filter.isActive = true;
   if (query.isActive === 'false') filter.isActive = false;
   if (query.search) {
@@ -92,10 +85,9 @@ async function createBom(data, actorId) {
   const name = String(data.name || '').trim();
   if (!name) throw new ApiError(400, 'BOM name is required');
 
-  const bomType = Object.values(BOM_TYPES).includes(data.bomType) ? data.bomType : BOM_TYPES.STANDARD;
   const components = await normalizeComponents(data.components || []);
-  if (bomType === BOM_TYPES.ROUTE && components.length === 0) {
-    throw new ApiError(400, 'Route BOM must have at least one component');
+  if (components.length === 0) {
+    throw new ApiError(400, 'BOM must have at least one component');
   }
 
   let finishedItem = null;
@@ -107,7 +99,6 @@ async function createBom(data, actorId) {
   const created = await bomRepository.create({
     name,
     finishedItem: finishedItem?._id || null,
-    bomType,
     version: String(data.version || '1.0').trim() || '1.0',
     effectiveDate: data.effectiveDate || new Date(),
     remarks: String(data.remarks || '').trim(),
@@ -123,18 +114,12 @@ async function updateBom(id, data, actorId) {
   const existing = await bomRepository.findById(id);
   if (!existing) throw new ApiError(404, 'BOM not found');
 
-  const bomType = data.bomType
-    ? Object.values(BOM_TYPES).includes(data.bomType)
-      ? data.bomType
-      : existing.bomType
-    : existing.bomType;
-
   let components = existing.components;
   if (data.components !== undefined) {
     components = await normalizeComponents(data.components || []);
   }
-  if (bomType === BOM_TYPES.ROUTE && (!components || components.length === 0)) {
-    throw new ApiError(400, 'Route BOM must have at least one component');
+  if (!components || components.length === 0) {
+    throw new ApiError(400, 'BOM must have at least one component');
   }
 
   let finishedItemId = existing.finishedItem;
@@ -154,7 +139,6 @@ async function updateBom(id, data, actorId) {
   await bomRepository.updateById(id, {
     name,
     finishedItem: finishedItemId,
-    bomType,
     version: data.version !== undefined ? String(data.version || '1.0').trim() || '1.0' : existing.version,
     effectiveDate: data.effectiveDate !== undefined ? data.effectiveDate || existing.effectiveDate : existing.effectiveDate,
     remarks: data.remarks !== undefined ? String(data.remarks || '').trim() : existing.remarks,
@@ -198,13 +182,13 @@ async function previewProduction(data) {
     lines.push({
       stockItem: item._id || component.stockItem,
       itemName: itemDisplayName(item),
-      partNo: component.partNo || '',
+      partNo: item.sku || '',
       qtyPerPcs,
       productionQty,
       requiredQty,
       availableQty,
       shortage,
-      unit: component.unit || item.unit || 'Nos',
+      unit: item.unit || 'Nos',
     });
   }
 
@@ -213,7 +197,6 @@ async function previewProduction(data) {
       _id: bom._id,
       name: bom.name,
       version: bom.version,
-      bomType: bom.bomType,
     },
     productionQty,
     hasShortage,

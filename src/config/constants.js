@@ -62,11 +62,6 @@ const STOCK_MOVEMENT_TYPES = Object.freeze({
   RETURN_IN: 'return_in',
 });
 
-const BOM_TYPES = Object.freeze({
-  STANDARD: 'Standard',
-  ROUTE: 'Route BOM',
-});
-
 const STOCK_CATALOG_KINDS = Object.freeze({
   CATEGORY: 'category',
   COMPONENT: 'component',
@@ -170,5 +165,4 @@ module.exports = {
   STOCK_CATALOG_KINDS,
   STOCK_ITEM_TYPES,
   DEFAULT_STOCK_COMPONENT_NAMES,
-  BOM_TYPES,
 };

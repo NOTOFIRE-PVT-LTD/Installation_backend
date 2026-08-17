@@ -24,6 +24,7 @@ router.delete('/items/:id', validate(stockValidator.itemIdParam), stockControlle
 
 router.get('/movements', validate(stockValidator.movementList), stockController.listMovements);
 router.post('/movements', validate(stockValidator.movementCreate), stockController.createMovement);
+router.put('/movements/:id', validate(stockValidator.movementUpdate), stockController.updateMovement);
 router.delete('/movements/:id', validate(stockValidator.movementIdParam), stockController.removeMovement);
 
 module.exports = router;

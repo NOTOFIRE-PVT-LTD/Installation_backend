@@ -67,6 +67,18 @@ const movementCreate = [
   body('remarks').optional().trim(),
 ];
 
+const movementUpdate = [
+  param('id').isMongoId().withMessage('Invalid movement id'),
+  body('stockItem').optional().isMongoId().withMessage('Valid stock item is required'),
+  body('quantity').optional().isFloat({ gt: 0 }).withMessage('Quantity must be greater than 0'),
+  body('amount').optional({ checkFalsy: true }).isFloat({ min: 0 }),
+  body('movementDate').optional({ checkFalsy: true }).isISO8601(),
+  body('supplierName').optional().trim(),
+  body('issuedTo').optional().trim(),
+  body('referenceNo').optional().trim(),
+  body('remarks').optional().trim(),
+];
+
 const movementIdParam = [param('id').isMongoId().withMessage('Invalid movement id')];
 
 const movementList = [
@@ -86,6 +98,7 @@ module.exports = {
   itemIdParam,
   itemList,
   movementCreate,
+  movementUpdate,
   movementIdParam,
   movementList,
 };
