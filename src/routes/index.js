@@ -18,6 +18,7 @@ const callLetterRoutes = require('./callLetter.routes');
 const bgApplicationRoutes = require('./bgApplication.routes');
 const stockRoutes = require('./stock.routes');
 const bomRoutes = require('./bom.routes');
+const itemMasterRoutes = require('./itemMaster.routes');
 
 const router = express.Router();
 
@@ -40,5 +41,6 @@ router.use('/call-letters', callLetterRoutes);
 router.use('/bg-applications', bgApplicationRoutes);
 router.use('/stock', stockRoutes);
 router.use('/bom', bomRoutes);
+router.use('/item-master', itemMasterRoutes);
 
 module.exports = router;

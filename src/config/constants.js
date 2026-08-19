@@ -53,6 +53,7 @@ const PERMISSION_KEYS = Object.freeze([
   'accounts',
   'stockItems',
   'bom',
+  'itemsMaster',
 ]);
 
 const STOCK_MOVEMENT_TYPES = Object.freeze({
@@ -130,6 +131,16 @@ const DEFAULT_STOCK_COMPONENT_NAMES = Object.freeze([
   'Zener Diode',
 ]);
 
+// Each key doubles as the MasterItem field name it fills, so the catalog and the
+// form stay in sync without a separate mapping table.
+const ITEM_MASTER_CATALOG_KINDS = Object.freeze({
+  ITEM_CATEGORY: 'itemCategory',
+  QTY_TYPE: 'qtyType',
+  PAYMENT: 'payment',
+});
+
+const ITEM_MASTER_CATALOG_FIELDS = Object.freeze(Object.values(ITEM_MASTER_CATALOG_KINDS));
+
 const INSPECTION_STATUS = Object.freeze({
   PENDING: 'Pending',
   IN_PROGRESS: 'In Progress',
@@ -165,4 +176,6 @@ module.exports = {
   STOCK_CATALOG_KINDS,
   STOCK_ITEM_TYPES,
   DEFAULT_STOCK_COMPONENT_NAMES,
+  ITEM_MASTER_CATALOG_KINDS,
+  ITEM_MASTER_CATALOG_FIELDS,
 };
