@@ -1,3 +1,4 @@
+const MasterItem = require('../models/MasterItem.model');
 const masterItemRepository = require('../repositories/masterItem.repository');
 const itemMasterCatalogRepository = require('../repositories/itemMasterCatalog.repository');
 const uploadService = require('./upload.service');
@@ -61,6 +62,14 @@ async function createCatalog(data, actorId) {
   const { kind } = data;
   if (!ITEM_MASTER_CATALOG_FIELDS.includes(kind)) throw new ApiError(400, 'Invalid catalog kind');
   return findOrCreateCatalog({ kind, name: data.name, actorId });
+}
+
+async function removeCatalog(id) {
+  const entry = await itemMasterCatalogRepository.findById(id);
+  if (!entry) throw new ApiError(404, 'Catalog entry not found');
+  await MasterItem.updateMany({ [entry.kind]: entry._id }, { $unset: { [entry.kind]: 1 } });
+  await itemMasterCatalogRepository.deleteById(id);
+  return { _id: id, kind: entry.kind };
 }
 
 // Each dropdown accepts either an existing catalog id or the "Others" sentinel paired
@@ -207,6 +216,7 @@ async function removeItem(id) {
 module.exports = {
   listCatalog,
   createCatalog,
+  removeCatalog,
   listItems,
   getItemById,
   createItem,

@@ -14,6 +14,7 @@ router.use(authenticate, requireRole(ROLES.ADMIN), requirePermission('itemsMaste
 
 router.get('/catalog', validate(itemMasterValidator.catalogList), itemMasterController.listCatalog);
 router.post('/catalog', validate(itemMasterValidator.catalogCreate), itemMasterController.createCatalog);
+router.delete('/catalog/:id', validate(itemMasterValidator.catalogIdParam), itemMasterController.removeCatalog);
 
 router.get('/items', validate(itemMasterValidator.itemList), itemMasterController.listItems);
 router.get('/items/:id', validate(itemMasterValidator.itemIdParam), itemMasterController.getItemById);

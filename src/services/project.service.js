@@ -391,7 +391,7 @@ async function addStation(projectId, data, files, actorId, user) {
 const STATION_TEXT_FIELDS = ['name', 'type', 'reasonForDelay', 'remarks'];
 const STATION_NUMBER_FIELDS = ['installationAmount'];
 const STATION_DATE_FIELDS = ['startDate', 'completionDate', 'commissioningDate'];
-const STATION_JSON_FIELDS = ['sse', 'installer', 'supervisor', 'materials'];
+const STATION_JSON_FIELDS = ['sse', 'installer', 'supervisor', 'materials', 'location'];
 const TDS_PERCENT = 2;
 
 function normalizeClaimRequests(rawRequests = []) {
@@ -611,7 +611,7 @@ async function updateStation(
 function computeStationBonus(project, station) {
   if (!station.commissioningDate) return { eligible: false, amount: 0, percent: 0 };
   const onTime = project.targetDate ? new Date(station.commissioningDate) <= new Date(project.targetDate) : true;
-  const qualityOk = Boolean(station.checklistFile) && Boolean(station.checklistSignedFile) && station.workPhotos.length > 0;
+  const qualityOk = station.workPhotos.length > 0;
   const eligible = onTime && qualityOk;
   const percent = project.bonusPercentOverride != null ? project.bonusPercentOverride : DEFAULT_BONUS_PERCENT;
   const amount = eligible ? Math.round(((station.amountClaimed || 0) * percent) / 100) : 0;
@@ -625,8 +625,8 @@ async function submitStationClaim(projectId, stationId, actorId, user) {
   const station = project.stations.id(stationId);
   if (!station) throw new ApiError(404, 'Station not found');
 
-  if (!(station.checklistFile && station.checklistSignedFile && station.workPhotos.length > 0)) {
-    throw new ApiError(400, 'Checklist upload, signed checklist, and work photos are mandatory before submitting a claim');
+  if (!(station.workPhotos.length > 0)) {
+    throw new ApiError(400, 'Work photos are mandatory before submitting a claim');
   }
   if (!(station.amountClaimed > 0)) {
     throw new ApiError(400, 'Enter at least one amount requested before submitting');

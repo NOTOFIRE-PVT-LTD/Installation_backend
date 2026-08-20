@@ -93,6 +93,11 @@ const stationSchema = new Schema(
     completePhotos: { type: [mediaSchema], default: [] },
     remainingPhotos: { type: [mediaSchema], default: [] },
     dailyReports: { type: [dailyReportEntrySchema], default: [] },
+    location: {
+      latitude: { type: Number, default: null },
+      longitude: { type: Number, default: null },
+      address: { type: String, default: '', trim: true },
+    },
   },
   { timestamps: true }
 );

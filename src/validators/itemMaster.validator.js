@@ -10,6 +10,8 @@ const catalogCreate = [
   body('name').trim().notEmpty().withMessage('Name is required'),
 ];
 
+const catalogIdParam = [param('id').isMongoId().withMessage('Invalid catalog id')];
+
 // Catalog dropdowns arrive either as a mongo id or the "__other__" sentinel, so they are
 // validated in the service instead of here.
 const itemFields = [
@@ -38,6 +40,7 @@ const itemList = [
 module.exports = {
   catalogList,
   catalogCreate,
+  catalogIdParam,
   itemCreate,
   itemUpdate,
   itemIdParam,

@@ -9,7 +9,7 @@ const masterItemSchema = new Schema(
     endUse: { type: String, default: '', trim: true },
     personAsked: { type: String, default: '', trim: true },
     priceGuarantee: { type: String, default: '', trim: true },
-    itemCategory: { type: Schema.Types.ObjectId, ref: 'ItemMasterCatalog', required: true },
+    itemCategory: catalogRef(),
     itemName: { type: String, required: true, trim: true },
     itemDescription: { type: String, default: '', trim: true },
     image: {

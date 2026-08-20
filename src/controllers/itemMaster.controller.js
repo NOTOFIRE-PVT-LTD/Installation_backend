@@ -12,6 +12,11 @@ const createCatalog = asyncHandler(async (req, res) => {
   sendSuccess(res, { statusCode: 201, message: 'Catalog entry added', data: entry });
 });
 
+const removeCatalog = asyncHandler(async (req, res) => {
+  await itemMasterService.removeCatalog(req.params.id);
+  sendSuccess(res, { message: 'Catalog entry removed' });
+});
+
 const listItems = asyncHandler(async (req, res) => {
   const result = await itemMasterService.listItems(req.query);
   sendSuccess(res, { message: 'Master items fetched', data: result.items, meta: result });
@@ -40,6 +45,7 @@ const removeItem = asyncHandler(async (req, res) => {
 module.exports = {
   listCatalog,
   createCatalog,
+  removeCatalog,
   listItems,
   getItemById,
   createItem,
