@@ -44,8 +44,11 @@ const bgApplicationSchema = new Schema(
     bgAmountWords: { type: String, default: '', trim: true },
     expiryDate: { type: Date, default: null },
     claimExpiryDate: { type: Date, default: null },
+    claimExpiryYear: { type: Number, min: 0, max: 100, default: null },
+    bgTenorYears: { type: Number, min: 0, default: 0 },
     bgTenorMonths: { type: Number, min: 0, default: 0 },
     bgTenorDays: { type: Number, min: 0, default: 0 },
+    bgTenorDate: { type: Date, default: null },
 
     // 6. Beneficiary Details
     beneficiaryNameAddress: { type: String, required: true, trim: true },

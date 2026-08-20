@@ -1,8 +1,22 @@
 const { body, param, query } = require('express-validator');
 const { BG_TYPES, APPLICATION_TYPES, BG_NATURES } = require('../models/BgApplication.model');
 
-const numberFields = ['bgTenorMonths', 'bgTenorDays', 'marginFdAmount', 'marginNewFdAmount', 'delayedPaymentInterestPercent'];
-const dateFields = ['applicantDateOfIncorporation', 'beneficiaryDateOfIncorporation', 'expiryDate', 'claimExpiryDate', 'declarationDate'];
+const numberFields = [
+  'bgTenorYears',
+  'bgTenorMonths',
+  'bgTenorDays',
+  'claimExpiryYear',
+  'marginFdAmount',
+  'marginNewFdAmount',
+  'delayedPaymentInterestPercent',
+];
+const dateFields = [
+  'applicantDateOfIncorporation',
+  'beneficiaryDateOfIncorporation',
+  'expiryDate',
+  'claimExpiryDate',
+  'declarationDate',
+];
 
 const create = [
   body('applicantNameAddress').trim().notEmpty().withMessage('Applicant name & address is required'),

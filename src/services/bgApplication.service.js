@@ -37,7 +37,15 @@ const TEXT_FIELDS = [
   'claimDebitAccountNumber',
   'otherDocumentsSpecify',
 ];
-const NUMBER_FIELDS = ['bgTenorMonths', 'bgTenorDays', 'marginFdAmount', 'marginNewFdAmount', 'delayedPaymentInterestPercent'];
+const NUMBER_FIELDS = [
+  'bgTenorYears',
+  'bgTenorMonths',
+  'bgTenorDays',
+  'claimExpiryYear',
+  'marginFdAmount',
+  'marginNewFdAmount',
+  'delayedPaymentInterestPercent',
+];
 const DATE_FIELDS = [
   'applicantDateOfIncorporation',
   'beneficiaryDateOfIncorporation',
@@ -53,7 +61,13 @@ function pickFields(data) {
     if (data[field] !== undefined) updates[field] = data[field];
   });
   NUMBER_FIELDS.forEach((field) => {
-    if (data[field] !== undefined) updates[field] = Number(data[field]) || 0;
+    if (data[field] !== undefined) {
+      if (field === 'claimExpiryYear' && (data[field] === '' || data[field] == null)) {
+        updates[field] = null;
+      } else {
+        updates[field] = Number(data[field]) || 0;
+      }
+    }
   });
   DATE_FIELDS.forEach((field) => {
     if (data[field] !== undefined) updates[field] = data[field] || null;
