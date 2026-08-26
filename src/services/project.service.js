@@ -28,6 +28,7 @@ const TEXT_FIELDS = [
   'panelSerialStart',
   'panelSerialEnd',
   'panelSerialNo',
+  'projectType',
   'invoiceNoDateSupply',
   'installationInvoice',
   'loaNo',
@@ -104,17 +105,20 @@ function applyProjectScopeFilter(filter, user) {
   return filter;
 }
 
-function buildPanelSerialNo({ serialType, panelSerialStart, panelSerialEnd, panelSerialNo }) {
-  const type = serialType || 'Panel Serial No.';
+function buildPanelSerialNo({ serialType, panelSerialStart, panelSerialEnd, panelSerialNo, projectName }) {
+  const type = serialType || 'LHS';
   const start = String(panelSerialStart || '').trim();
   const end = String(panelSerialEnd || '').trim();
 
-  if (type === 'Panel Serial No.') {
+  if (type === 'LHS' || type === 'AHD') {
+    if (start) return `${type}: ${start}`;
+  } else if (type === 'Others') {
+    const name = String(projectName || '').trim() || String(panelSerialNo || '').trim() || `Others-${Date.now()}`;
+    return `Others: ${name}`;
+  } else if (type === 'Panel Serial No.') {
     if (start && end) return `${start} - ${end}`;
     if (start) return start;
     if (end) return end;
-  } else if (type === 'LHS' || type === 'AHD') {
-    if (start) return `${type}: ${start}`;
   }
 
   return String(panelSerialNo || '').trim();
@@ -214,7 +218,7 @@ async function create(data, files, actorId, user) {
   const payload = {
     ...pickFields(data, { isAdmin: user?.role === ROLES.ADMIN }),
     panelSerialNo,
-    serialType: data.serialType || 'Panel Serial No.',
+    serialType: data.serialType || 'LHS',
     panelSerialStart: data.panelSerialStart || '',
     panelSerialEnd: data.panelSerialEnd || '',
     ...(await resolveInstallerAssignment(data, { required: true })),
@@ -255,6 +259,7 @@ async function update(id, data, files, actorId, user) {
       panelSerialStart: data.panelSerialStart !== undefined ? data.panelSerialStart : project.panelSerialStart,
       panelSerialEnd: data.panelSerialEnd !== undefined ? data.panelSerialEnd : project.panelSerialEnd,
       panelSerialNo: data.panelSerialNo !== undefined ? data.panelSerialNo : project.panelSerialNo,
+      projectName: data.projectName !== undefined ? data.projectName : project.projectName,
     });
     if (!panelSerialNo) throw new ApiError(400, 'Serial number details are required');
     if (panelSerialNo !== project.panelSerialNo) {
