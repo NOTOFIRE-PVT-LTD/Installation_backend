@@ -6,7 +6,7 @@ const { requirePermission } = require('../middlewares/permission.middleware');
 const validate = require('../middlewares/validate.middleware');
 const stockValidator = require('../validators/stock.validator');
 const { ROLES } = require('../config/constants');
-const { uploadStockItemFiles } = require('../middlewares/upload.middleware');
+const { uploadStockItemFiles, uploadSpreadsheet } = require('../middlewares/upload.middleware');
 
 const router = express.Router();
 
@@ -17,6 +17,7 @@ router.post('/catalog', validate(stockValidator.catalogCreate), stockController.
 router.get('/items/options', stockController.itemOptions);
 router.get('/summary', stockController.warehouseSummary);
 router.get('/items', validate(stockValidator.itemList), stockController.listItems);
+router.post('/items/import', uploadSpreadsheet, stockController.importItems);
 router.get('/items/:id', validate(stockValidator.itemIdParam), stockController.getItemById);
 router.post('/items', uploadStockItemFiles, validate(stockValidator.itemCreate), stockController.createItem);
 router.put('/items/:id', uploadStockItemFiles, validate(stockValidator.itemUpdate), stockController.updateItem);

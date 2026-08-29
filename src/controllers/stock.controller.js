@@ -37,6 +37,11 @@ const createItem = asyncHandler(async (req, res) => {
   sendSuccess(res, { statusCode: 201, message: 'Stock item created', data: item });
 });
 
+const importItems = asyncHandler(async (req, res) => {
+  const result = await stockService.bulkImportItems(req.file, req.user._id);
+  sendSuccess(res, { statusCode: 201, message: 'Stock items imported', data: result });
+});
+
 const updateItem = asyncHandler(async (req, res) => {
   const item = await stockService.updateItem(req.params.id, req.body, req.files, req.user._id);
   sendSuccess(res, { message: 'Stock item updated', data: item });
@@ -75,6 +80,7 @@ module.exports = {
   warehouseSummary,
   getItemById,
   createItem,
+  importItems,
   updateItem,
   removeItem,
   listMovements,
