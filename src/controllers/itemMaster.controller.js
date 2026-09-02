@@ -28,12 +28,12 @@ const getItemById = asyncHandler(async (req, res) => {
 });
 
 const createItem = asyncHandler(async (req, res) => {
-  const item = await itemMasterService.createItem(req.body, req.file, req.user._id);
+  const item = await itemMasterService.createItem(req.body, req.files, req.user._id);
   sendSuccess(res, { statusCode: 201, message: 'Master item created', data: item });
 });
 
 const updateItem = asyncHandler(async (req, res) => {
-  const item = await itemMasterService.updateItem(req.params.id, req.body, req.file, req.user._id);
+  const item = await itemMasterService.updateItem(req.params.id, req.body, req.files, req.user._id);
   sendSuccess(res, { message: 'Master item updated', data: item });
 });
 

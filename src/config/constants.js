@@ -134,12 +134,19 @@ const DEFAULT_STOCK_COMPONENT_NAMES = Object.freeze([
 // Each key doubles as the MasterItem field name it fills, so the catalog and the
 // form stay in sync without a separate mapping table.
 const ITEM_MASTER_CATALOG_KINDS = Object.freeze({
+  END_USE: 'endUse',
+  PRICE_GUARANTEE: 'priceGuarantee',
   ITEM_CATEGORY: 'itemCategory',
+  ITEM_NAME: 'itemName',
   QTY_TYPE: 'qtyType',
   PAYMENT: 'payment',
 });
 
 const ITEM_MASTER_CATALOG_FIELDS = Object.freeze(Object.values(ITEM_MASTER_CATALOG_KINDS));
+
+const ITEM_MASTER_ITEM_CATALOG_FIELDS = Object.freeze(
+  Object.values(ITEM_MASTER_CATALOG_KINDS).filter((kind) => kind !== ITEM_MASTER_CATALOG_KINDS.ITEM_NAME)
+);
 
 const INSPECTION_STATUS = Object.freeze({
   PENDING: 'Pending',
@@ -178,4 +185,5 @@ module.exports = {
   DEFAULT_STOCK_COMPONENT_NAMES,
   ITEM_MASTER_CATALOG_KINDS,
   ITEM_MASTER_CATALOG_FIELDS,
+  ITEM_MASTER_ITEM_CATALOG_FIELDS,
 };

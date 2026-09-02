@@ -108,7 +108,11 @@ const uploadDailyReportMedia = upload.fields([
 
 const uploadStockItemFiles = upload.fields([{ name: 'docs', maxCount: 20 }]);
 
-const uploadMasterItemImage = upload.single('itemImage');
+const uploadMasterItemFiles = upload.fields([
+  { name: 'itemImage', maxCount: 1 },
+  { name: 'billPhoto', maxCount: 1 },
+  { name: 'visitingCard', maxCount: 1 },
+]);
 
 module.exports = {
   uploadReportFiles,
@@ -121,5 +125,5 @@ module.exports = {
   uploadDailyReportPhotos: uploadDailyReportMedia,
   uploadDailyReportMedia,
   uploadStockItemFiles,
-  uploadMasterItemImage,
+  uploadMasterItemFiles,
 };

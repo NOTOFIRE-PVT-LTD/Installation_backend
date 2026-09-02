@@ -6,7 +6,7 @@ const { requirePermission } = require('../middlewares/permission.middleware');
 const validate = require('../middlewares/validate.middleware');
 const itemMasterValidator = require('../validators/itemMaster.validator');
 const { ROLES } = require('../config/constants');
-const { uploadMasterItemImage } = require('../middlewares/upload.middleware');
+const { uploadMasterItemFiles } = require('../middlewares/upload.middleware');
 
 const router = express.Router();
 
@@ -20,13 +20,13 @@ router.get('/items', validate(itemMasterValidator.itemList), itemMasterControlle
 router.get('/items/:id', validate(itemMasterValidator.itemIdParam), itemMasterController.getItemById);
 router.post(
   '/items',
-  uploadMasterItemImage,
+  uploadMasterItemFiles,
   validate(itemMasterValidator.itemCreate),
   itemMasterController.createItem
 );
 router.put(
   '/items/:id',
-  uploadMasterItemImage,
+  uploadMasterItemFiles,
   validate(itemMasterValidator.itemUpdate),
   itemMasterController.updateItem
 );

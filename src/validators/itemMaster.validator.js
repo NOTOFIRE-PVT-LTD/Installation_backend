@@ -1,5 +1,5 @@
 const { body, param, query } = require('express-validator');
-const { ITEM_MASTER_CATALOG_FIELDS } = require('../config/constants');
+const { ITEM_MASTER_CATALOG_FIELDS, ITEM_MASTER_ITEM_CATALOG_FIELDS } = require('../config/constants');
 
 const catalogList = [
   query('kind').isIn(ITEM_MASTER_CATALOG_FIELDS).withMessage('Invalid catalog kind'),
@@ -15,9 +15,7 @@ const catalogIdParam = [param('id').isMongoId().withMessage('Invalid catalog id'
 // Catalog dropdowns arrive either as a mongo id or the "__other__" sentinel, so they are
 // validated in the service instead of here.
 const itemFields = [
-  body('endUse').optional().trim(),
   body('personAsked').optional().trim(),
-  body('priceGuarantee').optional().trim(),
   body('itemName').trim().notEmpty().withMessage('Item name is required'),
   body('itemDescription').optional().trim(),
   body('quantity').optional({ checkFalsy: true }).isFloat({ min: 0 }).withMessage('Quantity cannot be negative'),
@@ -34,7 +32,7 @@ const itemList = [
   query('page').optional().isInt({ min: 1 }),
   query('pageSize').optional().isInt({ min: 1, max: 100 }),
   query('search').optional().trim(),
-  ...ITEM_MASTER_CATALOG_FIELDS.map((field) => query(field).optional({ checkFalsy: true }).isMongoId()),
+  ...ITEM_MASTER_ITEM_CATALOG_FIELDS.map((field) => query(field).optional({ checkFalsy: true }).isMongoId()),
 ];
 
 module.exports = {
