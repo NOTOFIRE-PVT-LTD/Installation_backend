@@ -160,6 +160,9 @@ const projectSchema = new Schema(
       telecomExchanges: { type: Number, default: 0 },
       buildings: { type: Number, default: 0 },
       signal: { type: Number, default: 0 },
+      panel: { type: Number, default: 0 },
+      lhs: { type: Number, default: 0 },
+      asd: { type: Number, default: 0 },
     },
     loaItems: { type: [itemQtySchema], default: [] },
     railwayOfficers: {
