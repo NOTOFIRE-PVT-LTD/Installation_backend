@@ -106,15 +106,15 @@ function applyProjectScopeFilter(filter, user) {
 }
 
 function buildPanelSerialNo({ serialType, panelSerialStart, panelSerialEnd, panelSerialNo, projectName }) {
-  const type = serialType || 'LHS';
+  const type = serialType || 'LHS/ASD';
   const start = String(panelSerialStart || '').trim();
   const end = String(panelSerialEnd || '').trim();
 
-  if (type === 'LHS' || type === 'AHD') {
-    if (start) return `${type}: ${start}`;
-  } else if (type === 'Others') {
-    const name = String(projectName || '').trim() || String(panelSerialNo || '').trim() || `Others-${Date.now()}`;
-    return `Others: ${name}`;
+  if (type === 'LHS/ASD' || type === 'LHS' || type === 'AHD') {
+    if (start) return type === 'LHS/ASD' ? `LHS/ASD: ${start}` : `${type}: ${start}`;
+  } else if (type === 'ALL' || type === 'Others') {
+    const name = String(projectName || '').trim() || String(panelSerialNo || '').trim() || `ALL-${Date.now()}`;
+    return `ALL: ${name}`;
   } else if (type === 'Panel Serial No.') {
     if (start && end) return `${start} - ${end}`;
     if (start) return start;
@@ -218,7 +218,7 @@ async function create(data, files, actorId, user) {
   const payload = {
     ...pickFields(data, { isAdmin: user?.role === ROLES.ADMIN }),
     panelSerialNo,
-    serialType: data.serialType || 'LHS',
+    serialType: data.serialType || 'LHS/ASD',
     panelSerialStart: data.panelSerialStart || '',
     panelSerialEnd: data.panelSerialEnd || '',
     ...(await resolveInstallerAssignment(data, { required: true })),

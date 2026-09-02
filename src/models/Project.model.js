@@ -113,8 +113,8 @@ const projectSchema = new Schema(
     railwayZone: { type: String, required: true, trim: true },
     serialType: {
       type: String,
-      enum: ['LHS', 'AHD', 'Others', 'Panel Serial No.'],
-      default: 'LHS',
+      enum: ['LHS/ASD', 'ALL', 'LHS', 'AHD', 'Others', 'Panel Serial No.'],
+      default: 'LHS/ASD',
       trim: true,
     },
     panelSerialStart: { type: String, default: '', trim: true },
