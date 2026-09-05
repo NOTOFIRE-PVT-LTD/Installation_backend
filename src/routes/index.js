@@ -19,6 +19,7 @@ const bgApplicationRoutes = require('./bgApplication.routes');
 const stockRoutes = require('./stock.routes');
 const bomRoutes = require('./bom.routes');
 const itemMasterRoutes = require('./itemMaster.routes');
+const uploadRoutes = require('./upload.routes');
 
 const router = express.Router();
 
@@ -42,5 +43,6 @@ router.use('/bg-applications', bgApplicationRoutes);
 router.use('/stock', stockRoutes);
 router.use('/bom', bomRoutes);
 router.use('/item-master', itemMasterRoutes);
+router.use('/uploads', uploadRoutes);
 
 module.exports = router;

@@ -42,6 +42,16 @@ const importItems = asyncHandler(async (req, res) => {
   sendSuccess(res, { statusCode: 201, message: 'Stock items imported', data: result });
 });
 
+const downloadImportTemplate = asyncHandler(async (_req, res) => {
+  const buffer = await stockService.buildStockItemsImportTemplate();
+  res.setHeader(
+    'Content-Type',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  );
+  res.setHeader('Content-Disposition', 'attachment; filename="stock-items-import-template.xlsx"');
+  res.send(buffer);
+});
+
 const updateItem = asyncHandler(async (req, res) => {
   const item = await stockService.updateItem(req.params.id, req.body, req.files, req.user._id);
   sendSuccess(res, { message: 'Stock item updated', data: item });
@@ -50,6 +60,11 @@ const updateItem = asyncHandler(async (req, res) => {
 const removeItem = asyncHandler(async (req, res) => {
   await stockService.removeItem(req.params.id);
   sendSuccess(res, { message: 'Stock item deleted' });
+});
+
+const removeItems = asyncHandler(async (req, res) => {
+  const result = await stockService.removeItems(req.body.ids);
+  sendSuccess(res, { message: 'Stock items deleted', data: result });
 });
 
 const listMovements = asyncHandler(async (req, res) => {
@@ -72,6 +87,11 @@ const removeMovement = asyncHandler(async (req, res) => {
   sendSuccess(res, { message: 'Stock movement deleted' });
 });
 
+const removeMovements = asyncHandler(async (req, res) => {
+  const result = await stockService.removeMovements(req.body.ids);
+  sendSuccess(res, { message: 'Stock movements deleted', data: result });
+});
+
 module.exports = {
   listCatalog,
   createCatalog,
@@ -81,10 +101,13 @@ module.exports = {
   getItemById,
   createItem,
   importItems,
+  downloadImportTemplate,
   updateItem,
   removeItem,
+  removeItems,
   listMovements,
   createMovement,
   updateMovement,
   removeMovement,
+  removeMovements,
 };

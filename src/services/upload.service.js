@@ -22,6 +22,23 @@ function uploadVideoBuffer(buffer) {
   return uploadBuffer(buffer, { folder: env.cloudinary.videoFolder, resourceType: 'video' });
 }
 
+function getUploadSignature({ resourceType = 'image' } = {}) {
+  const type = resourceType === 'video' ? 'video' : 'image';
+  const folder = type === 'video' ? env.cloudinary.videoFolder : env.cloudinary.imageFolder;
+  const timestamp = Math.round(Date.now() / 1000);
+  const paramsToSign = { timestamp, folder };
+  const signature = cloudinary.utils.api_sign_request(paramsToSign, env.cloudinary.apiSecret);
+
+  return {
+    cloudName: env.cloudinary.cloudName,
+    apiKey: env.cloudinary.apiKey,
+    timestamp,
+    folder,
+    signature,
+    resourceType: type,
+  };
+}
+
 function uploadDocumentBuffer(buffer) {
   return uploadBuffer(buffer, { folder: env.cloudinary.documentFolder, resourceType: 'raw' });
 }
@@ -44,4 +61,11 @@ async function deleteAsset(publicId, resourceType = 'image') {
   }
 }
 
-module.exports = { uploadImageBuffer, uploadVideoBuffer, uploadDocumentBuffer, uploadCadFile, deleteAsset };
+module.exports = {
+  uploadImageBuffer,
+  uploadVideoBuffer,
+  uploadDocumentBuffer,
+  uploadCadFile,
+  deleteAsset,
+  getUploadSignature,
+};

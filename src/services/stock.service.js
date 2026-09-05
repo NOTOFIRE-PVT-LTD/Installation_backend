@@ -99,10 +99,9 @@ async function listCatalog(query) {
   if (kind === STOCK_CATALOG_KINDS.COMPONENT) {
     await ensureDefaultStockComponents();
     const filter = { kind };
+    // Without a parent filter, return all components so the form can work without category.
     if (query.parent) {
       filter.$or = [{ parent: null }, { parent: query.parent }];
-    } else {
-      filter.parent = null;
     }
     const items = await stockCatalogRepository.find(filter, { sort: { name: 1 } });
     return sortCatalog(items, DEFAULT_STOCK_COMPONENT_NAMES);
@@ -143,13 +142,19 @@ async function createCatalog(data, actorId) {
 }
 
 async function resolveItemCatalog(data, actorId) {
-  const category = await resolveCatalogEntry({
-    kind: STOCK_CATALOG_KINDS.CATEGORY,
-    id: data.category,
-    otherName: data.newCategory || data.categoryName,
-    actorId,
-    label: 'component category',
-  });
+  // Category is optional — form flow is Component → Sub Component only.
+  const hasCategory =
+    Boolean(String(data.category || '').trim()) ||
+    Boolean(String(data.newCategory || data.categoryName || '').trim());
+  const category = hasCategory
+    ? await resolveCatalogEntry({
+        kind: STOCK_CATALOG_KINDS.CATEGORY,
+        id: data.category || OTHER_VALUE,
+        otherName: data.newCategory || data.categoryName,
+        actorId,
+        label: 'component category',
+      })
+    : null;
   const component = await resolveCatalogEntry({
     kind: STOCK_CATALOG_KINDS.COMPONENT,
     id: data.component,
@@ -161,7 +166,7 @@ async function resolveItemCatalog(data, actorId) {
   const subComponentName = data.newSubComponent || data.subComponentName;
   const hasSubComponent = isOther(data.subComponent)
     ? Boolean(String(subComponentName || '').trim())
-    : true;
+    : Boolean(String(data.subComponent || '').trim());
   const subComponent = hasSubComponent
     ? await resolveCatalogEntry({
         kind: STOCK_CATALOG_KINDS.SUB_COMPONENT,
@@ -176,7 +181,7 @@ async function resolveItemCatalog(data, actorId) {
 }
 
 function buildItemName({ category, component, subComponent }) {
-  return subComponent?.name || component.name || category.name;
+  return subComponent?.name || component?.name || category?.name || '';
 }
 
 async function uploadDocs(files = []) {
@@ -333,10 +338,10 @@ async function createItem(data, files, actorId) {
   const docs = await uploadDocs(files?.docs || []);
 
   const created = await stockItemRepository.create({
-    category: category._id,
+    category: category?._id || null,
     component: component._id,
     subComponent: subComponent?._id || null,
-    categoryName: category.name,
+    categoryName: category?.name || '',
     componentName: component.name,
     subComponentName: subComponent?.name || '',
     name: buildItemName({ category, component, subComponent }),
@@ -371,13 +376,17 @@ async function updateItem(id, data, files, actorId) {
   );
 
   await stockItemRepository.updateById(id, {
-    category: category._id,
+    category: category?._id || existing.category || null,
     component: component._id,
     subComponent: subComponent?._id || null,
-    categoryName: category.name,
+    categoryName: category?.name || existing.categoryName || '',
     componentName: component.name,
     subComponentName: subComponent?.name || '',
-    name: buildItemName({ category, component, subComponent }),
+    name: buildItemName({
+      category: category || { name: existing.categoryName },
+      component,
+      subComponent,
+    }),
     sku: data.sku !== undefined ? String(data.sku || '').trim() : existing.sku,
     unit: String(data.unit || existing.unit || 'Nos').trim() || 'Nos',
     quantity: data.quantity !== undefined ? Math.max(0, Number(data.quantity) || 0) : existing.quantity,
@@ -406,6 +415,23 @@ async function removeItem(id) {
     (existing.docs || []).map((doc) => uploadService.deleteAsset(doc.publicId, doc.resourceType || 'raw'))
   );
   await stockItemRepository.deleteById(id);
+}
+
+async function removeItems(ids) {
+  const uniqueIds = [...new Set((ids || []).map((id) => String(id)).filter(Boolean))];
+  if (!uniqueIds.length) throw new ApiError(400, 'Select at least one stock item');
+
+  const deleted = [];
+  const failed = [];
+  for (const id of uniqueIds) {
+    try {
+      await removeItem(id);
+      deleted.push(id);
+    } catch (err) {
+      failed.push({ id, message: err.message || 'Failed to delete' });
+    }
+  }
+  return { deleted, failed, requested: uniqueIds.length };
 }
 
 async function listMovements(query) {
@@ -639,6 +665,23 @@ async function removeMovement(id) {
   await stockMovementRepository.deleteById(id);
 }
 
+async function removeMovements(ids) {
+  const uniqueIds = [...new Set((ids || []).map((id) => String(id)).filter(Boolean))];
+  if (!uniqueIds.length) throw new ApiError(400, 'Select at least one stock movement');
+
+  const deleted = [];
+  const failed = [];
+  for (const id of uniqueIds) {
+    try {
+      await removeMovement(id);
+      deleted.push(id);
+    } catch (err) {
+      failed.push({ id, message: err.message || 'Failed to delete' });
+    }
+  }
+  return { deleted, failed, requested: uniqueIds.length };
+}
+
 async function warehouseSummary() {
   const items = await stockItemRepository.find({}, { sort: { name: 1 } });
   const movements = await StockMovement.aggregate([
@@ -791,10 +834,33 @@ function normalizeItemType(value) {
   return match || STOCK_ITEM_TYPES[0];
 }
 
-function itemCatalogKey({ categoryName, componentName, subComponentName }) {
-  return [categoryName, componentName, subComponentName]
+function itemCatalogKey({ componentName, subComponentName }) {
+  return [componentName, subComponentName]
     .map((part) => String(part || '').trim().toLowerCase())
     .join('::');
+}
+
+async function buildStockItemsImportTemplate() {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Stock Items');
+  sheet.columns = [
+    { header: 'Component Name', key: 'componentName', width: 28 },
+    { header: 'Sub Component Name', key: 'subComponentName', width: 28 },
+    { header: 'Type', key: 'itemType', width: 16 },
+  ];
+  sheet.getRow(1).font = { bold: true };
+  sheet.addRow({
+    componentName: 'Cable',
+    subComponentName: '6mm wire',
+    itemType: 'Single Use',
+  });
+  sheet.addRow({
+    componentName: 'Bracket',
+    subComponentName: '',
+    itemType: 'Reusable',
+  });
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer);
 }
 
 async function parseStockItemsWorkbook(file) {
@@ -811,11 +877,6 @@ async function parseStockItemsWorkbook(file) {
   if (!worksheet) throw new ApiError(400, 'The uploaded file has no readable sheet');
 
   const headerRow = worksheet.getRow(1);
-  const categoryCol = findColumnIndex(headerRow, [
-    'component category',
-    'category',
-    'component category name',
-  ]);
   const componentCol = findColumnIndex(headerRow, ['component name', 'component']);
   const subComponentCol = findColumnIndex(headerRow, [
     'sub component name',
@@ -825,23 +886,22 @@ async function parseStockItemsWorkbook(file) {
   ]);
   const typeCol = findColumnIndex(headerRow, ['type', 'item type']);
 
-  if (categoryCol === -1 || componentCol === -1) {
+  if (componentCol === -1) {
     throw new ApiError(
       400,
-      'The file must have Component Category and Component Name column headers'
+      'The file must have these columns: Component Name, Sub Component Name (optional), Type'
     );
   }
 
   const rows = [];
   worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
     if (rowNumber === 1) return;
-    const categoryName = String(row.getCell(categoryCol).value || '').trim();
     const componentName = String(row.getCell(componentCol).value || '').trim();
     const subComponentName =
       subComponentCol === -1 ? '' : String(row.getCell(subComponentCol).value || '').trim();
     const itemType = typeCol === -1 ? STOCK_ITEM_TYPES[0] : normalizeItemType(row.getCell(typeCol).value);
-    if (categoryName && componentName) {
-      rows.push({ categoryName, componentName, subComponentName, itemType });
+    if (componentName) {
+      rows.push({ componentName, subComponentName, itemType });
     }
   });
 
@@ -854,11 +914,10 @@ async function bulkImportItems(file, actorId) {
     throw new ApiError(400, 'No valid rows found in the uploaded file');
   }
 
-  const existing = await stockItemRepository.find({}, { select: 'categoryName componentName subComponentName' });
+  const existing = await stockItemRepository.find({}, { select: 'componentName subComponentName' });
   const existingKeys = new Set(
     existing.map((item) =>
       itemCatalogKey({
-        categoryName: item.categoryName,
         componentName: item.componentName,
         subComponentName: item.subComponentName,
       })
@@ -878,8 +937,6 @@ async function bulkImportItems(file, actorId) {
     seenInFile.add(key);
 
     const payload = {
-      category: OTHER_VALUE,
-      newCategory: row.categoryName,
       component: OTHER_VALUE,
       newComponent: row.componentName,
       subComponent: row.subComponentName ? OTHER_VALUE : '',
@@ -889,10 +946,10 @@ async function bulkImportItems(file, actorId) {
 
     const { category, component, subComponent } = await resolveItemCatalog(payload, actorId);
     await stockItemRepository.create({
-      category: category._id,
+      category: category?._id || null,
       component: component._id,
       subComponent: subComponent?._id || null,
-      categoryName: category.name,
+      categoryName: category?.name || '',
       componentName: component.name,
       subComponentName: subComponent?.name || '',
       name: buildItemName({ category, component, subComponent }),
@@ -924,6 +981,8 @@ module.exports = {
   createItem,
   updateItem,
   removeItem,
+  removeItems,
+  buildStockItemsImportTemplate,
   bulkImportItems,
   listMovements,
   getMovementById,
@@ -931,6 +990,7 @@ module.exports = {
   updateMovement,
   createUtilizeBatch,
   removeMovement,
+  removeMovements,
   warehouseSummary,
   getBalances,
 };

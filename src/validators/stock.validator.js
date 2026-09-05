@@ -49,6 +49,11 @@ const itemUpdate = [
 
 const itemIdParam = [param('id').isMongoId().withMessage('Invalid stock item id')];
 
+const bulkIds = [
+  body('ids').isArray({ min: 1 }).withMessage('Select at least one record'),
+  body('ids.*').isMongoId().withMessage('Invalid id'),
+];
+
 const itemList = [
   query('page').optional().isInt({ min: 1 }),
   query('pageSize').optional().isInt({ min: 1, max: 100 }),
@@ -96,6 +101,7 @@ module.exports = {
   itemCreate,
   itemUpdate,
   itemIdParam,
+  bulkIds,
   itemList,
   movementCreate,
   movementUpdate,

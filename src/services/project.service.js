@@ -748,16 +748,57 @@ async function removeStation(projectId, stationId, user) {
   return fetchProjectById(projectId);
 }
 
+async function resolveDailyReportMedia(data, files) {
+  const photoFiles = files?.photos || [];
+  const videoFiles = files?.videos || [];
+
+  const uploadedPhotos = photoFiles.length
+    ? await Promise.all(photoFiles.map((f) => uploadService.uploadImageBuffer(f.buffer)))
+    : [];
+  const uploadedVideos = videoFiles.length
+    ? await Promise.all(videoFiles.map((f) => uploadService.uploadVideoBuffer(f.buffer)))
+    : [];
+
+  const parseList = (value) => {
+    if (!value) return [];
+    if (Array.isArray(value)) return value;
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  };
+
+  const normalize = (items) =>
+    items
+      .map((item) => ({
+        url: String(item?.url || '').trim(),
+        publicId: String(item?.publicId || item?.public_id || '').trim(),
+      }))
+      .filter((item) => item.url && item.publicId);
+
+  return {
+    photos: uploadedPhotos.length ? uploadedPhotos : normalize(parseList(data.photos)),
+    videos: uploadedVideos.length ? uploadedVideos : normalize(parseList(data.videos)),
+  };
+}
+
 async function addDailyReport(projectId, data, files, actorId, user) {
   const project = await fetchProjectById(projectId);
   assertProjectAccess(project, user);
 
-  const photoFiles = files?.photos || [];
-  const videoFiles = files?.videos || [];
+  const { photos, videos } = await resolveDailyReportMedia(data, files);
+  if (!photos.length && !videos.length && !String(data.comment || '').trim() && !String(data.issue || '').trim()) {
+    throw new ApiError(400, 'Add at least one photo, video, comment, or issue');
+  }
 
   project.dailyReports.push({
-    photos: await Promise.all(photoFiles.map((f) => uploadService.uploadImageBuffer(f.buffer))),
-    videos: await Promise.all(videoFiles.map((f) => uploadService.uploadVideoBuffer(f.buffer))),
+    photos,
+    videos,
     comment: data.comment || '',
     issue: data.issue || '',
     createdBy: actorId,
@@ -791,12 +832,14 @@ async function addStationDailyReport(projectId, stationId, data, files, actorId,
   const station = project.stations.id(stationId);
   if (!station) throw new ApiError(404, 'Station not found');
 
-  const photoFiles = files?.photos || [];
-  const videoFiles = files?.videos || [];
+  const { photos, videos } = await resolveDailyReportMedia(data, files);
+  if (!photos.length && !videos.length && !String(data.comment || '').trim() && !String(data.issue || '').trim()) {
+    throw new ApiError(400, 'Add at least one photo, video, comment, or issue');
+  }
 
   station.dailyReports.push({
-    photos: await Promise.all(photoFiles.map((f) => uploadService.uploadImageBuffer(f.buffer))),
-    videos: await Promise.all(videoFiles.map((f) => uploadService.uploadVideoBuffer(f.buffer))),
+    photos,
+    videos,
     comment: data.comment || '',
     issue: data.issue || '',
     createdBy: actorId,

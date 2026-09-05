@@ -3,7 +3,7 @@ const projectController = require('../controllers/project.controller');
 const authenticate = require('../middlewares/authenticate.middleware');
 const { requireRole } = require('../middlewares/authorize.middleware');
 const { requirePermission, requirePermissionOrRole } = require('../middlewares/permission.middleware');
-const { uploadProjectFiles, uploadStationPhotos, uploadDailyReportPhotos } = require('../middlewares/upload.middleware');
+const { uploadProjectFiles, uploadStationPhotos } = require('../middlewares/upload.middleware');
 const validate = require('../middlewares/validate.middleware');
 const projectValidator = require('../validators/project.validator');
 const { ROLES } = require('../config/constants');
@@ -93,7 +93,6 @@ router.post(
 router.post(
   '/:id/stations/:stationId/daily-reports',
   requirePermissionOrRole('projects', ROLES.USER),
-  uploadDailyReportPhotos,
   validate(projectValidator.createStationDailyReport),
   projectController.addStationDailyReport
 );
@@ -107,7 +106,6 @@ router.delete(
 router.post(
   '/:id/daily-reports',
   requirePermissionOrRole('projects', ROLES.USER),
-  uploadDailyReportPhotos,
   validate(projectValidator.createDailyReport),
   projectController.addDailyReport
 );
