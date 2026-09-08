@@ -17,6 +17,11 @@ router.get('/options', nitTenderController.options);
 router.use(requirePermission('tenders'));
 
 router.get('/', validate(nitTenderValidator.list), nitTenderController.list);
+router.post(
+  '/parse-items',
+  validate(nitTenderValidator.parseItems),
+  nitTenderController.parseItemsFromPdfText
+);
 router.get('/:id', validate(nitTenderValidator.idParam), nitTenderController.getById);
 router.post('/', validate(nitTenderValidator.create), nitTenderController.create);
 router.put('/:id', validate(nitTenderValidator.update), nitTenderController.update);

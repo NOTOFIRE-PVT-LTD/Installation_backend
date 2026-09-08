@@ -52,6 +52,24 @@ const downloadImportTemplate = asyncHandler(async (_req, res) => {
   res.send(buffer);
 });
 
+const importReceives = asyncHandler(async (req, res) => {
+  const result = await stockService.bulkImportReceives(req.file, req.user._id);
+  sendSuccess(res, { statusCode: 201, message: 'Receive records imported', data: result });
+});
+
+const downloadReceiveImportTemplate = asyncHandler(async (_req, res) => {
+  const buffer = await stockService.buildReceiveImportTemplate();
+  res.setHeader(
+    'Content-Type',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  );
+  res.setHeader(
+    'Content-Disposition',
+    'attachment; filename="receive-from-supplier-import-template.xlsx"'
+  );
+  res.send(buffer);
+});
+
 const updateItem = asyncHandler(async (req, res) => {
   const item = await stockService.updateItem(req.params.id, req.body, req.files, req.user._id);
   sendSuccess(res, { message: 'Stock item updated', data: item });
@@ -102,6 +120,8 @@ module.exports = {
   createItem,
   importItems,
   downloadImportTemplate,
+  importReceives,
+  downloadReceiveImportTemplate,
   updateItem,
   removeItem,
   removeItems,

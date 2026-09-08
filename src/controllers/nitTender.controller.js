@@ -1,4 +1,5 @@
 const nitTenderService = require('../services/nitTender.service');
+const tenderItemsAiService = require('../services/tenderItemsAi.service');
 const asyncHandler = require('../utils/asyncHandler');
 const { sendSuccess } = require('../utils/ApiResponse');
 const whatsappNotificationService = require('../services/whatsappNotification.service');
@@ -12,6 +13,11 @@ const list = asyncHandler(async (req, res) => {
 const options = asyncHandler(async (req, res) => {
   const items = await nitTenderService.options();
   sendSuccess(res, { message: 'Tender LOA options fetched', data: items });
+});
+
+const parseItemsFromPdfText = asyncHandler(async (req, res) => {
+  const result = await tenderItemsAiService.parseTenderItemsWithAi(req.body?.text);
+  sendSuccess(res, { message: 'Tender items extracted', data: result });
 });
 
 const getById = asyncHandler(async (req, res) => {
@@ -40,4 +46,4 @@ const remove = asyncHandler(async (req, res) => {
   sendSuccess(res, { message: 'Tender deleted' });
 });
 
-module.exports = { list, options, getById, create, update, remove };
+module.exports = { list, options, parseItemsFromPdfText, getById, create, update, remove };

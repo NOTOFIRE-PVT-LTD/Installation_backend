@@ -26,6 +26,15 @@ router.put('/items/:id', uploadStockItemFiles, validate(stockValidator.itemUpdat
 router.delete('/items/:id', validate(stockValidator.itemIdParam), stockController.removeItem);
 
 router.get('/movements', validate(stockValidator.movementList), stockController.listMovements);
+router.get(
+  '/movements/receive/import-template',
+  stockController.downloadReceiveImportTemplate
+);
+router.post(
+  '/movements/receive/import',
+  uploadSpreadsheet,
+  stockController.importReceives
+);
 router.post('/movements', validate(stockValidator.movementCreate), stockController.createMovement);
 router.post('/movements/bulk-delete', validate(stockValidator.bulkIds), stockController.removeMovements);
 router.put('/movements/:id', validate(stockValidator.movementUpdate), stockController.updateMovement);

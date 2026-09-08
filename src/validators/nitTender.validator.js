@@ -50,4 +50,15 @@ const list = [
   query('search').optional().trim(),
 ];
 
-module.exports = { create, update, idParam, list };
+const parseItems = [
+  body('text')
+    .isString()
+    .withMessage('PDF text is required')
+    .trim()
+    .notEmpty()
+    .withMessage('PDF text is required')
+    .isLength({ max: 200000 })
+    .withMessage('PDF text is too large'),
+];
+
+module.exports = { create, update, idParam, list, parseItems };

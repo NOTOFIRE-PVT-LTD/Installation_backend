@@ -972,6 +972,236 @@ async function bulkImportItems(file, actorId) {
   return { inserted, skipped, total: rows.length };
 }
 
+function normalizeCellDate(value) {
+  if (value == null || value === '') return new Date();
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+  if (typeof value === 'number') {
+    // Excel serial date
+    const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+    const parsed = new Date(excelEpoch.getTime() + value * 24 * 60 * 60 * 1000);
+    return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+  }
+  const text = String(value).trim();
+  const parsed = new Date(text);
+  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+}
+
+function stockItemMatchKey(componentName, subComponentName) {
+  return [componentName, subComponentName]
+    .map((part) => String(part || '').trim().toLowerCase())
+    .join('::');
+}
+
+function findStockItemForReceive(items, row) {
+  const componentName = String(row.componentName || '').trim();
+  const subComponentName = String(row.subComponentName || '').trim();
+  const stockItemLabel = String(row.stockItemLabel || '').trim();
+
+  if (componentName) {
+    const key = stockItemMatchKey(componentName, subComponentName);
+    const byParts = items.find(
+      (item) => stockItemMatchKey(item.componentName, item.subComponentName) === key
+    );
+    if (byParts) return byParts;
+  }
+
+  if (stockItemLabel) {
+    const needle = stockItemLabel.toLowerCase();
+    return items.find((item) => {
+      const path = [item.componentName, item.subComponentName].filter(Boolean).join(' / ').toLowerCase();
+      return (
+        String(item.name || '').toLowerCase() === needle ||
+        path === needle ||
+        String(item.sku || '').toLowerCase() === needle
+      );
+    });
+  }
+
+  return null;
+}
+
+async function buildReceiveImportTemplate() {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Receive from Supplier');
+  sheet.columns = [
+    { header: 'Component Name', key: 'componentName', width: 24 },
+    { header: 'Sub Component Name', key: 'subComponentName', width: 24 },
+    { header: 'Supplier Name', key: 'supplierName', width: 22 },
+    { header: 'Amount', key: 'amount', width: 12 },
+    { header: 'Quantity', key: 'quantity', width: 12 },
+    { header: 'Date', key: 'movementDate', width: 14 },
+    { header: 'Reference / Challan No.', key: 'referenceNo', width: 22 },
+    { header: 'Remarks', key: 'remarks', width: 28 },
+  ];
+  sheet.getRow(1).font = { bold: true };
+  sheet.addRow({
+    componentName: 'Cable',
+    subComponentName: '6mm wire',
+    supplierName: 'ABC Traders',
+    amount: 1500,
+    quantity: 10,
+    movementDate: '2026-09-07',
+    referenceNo: 'CH-001',
+    remarks: 'Sample receive row',
+  });
+  sheet.addRow({
+    componentName: 'Bracket',
+    subComponentName: '',
+    supplierName: 'XYZ Supplies',
+    amount: 500,
+    quantity: 5,
+    movementDate: '2026-09-07',
+    referenceNo: '',
+    remarks: '',
+  });
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+}
+
+async function parseReceiveWorkbook(file) {
+  if (!file?.buffer) throw new ApiError(400, 'Upload an Excel file');
+
+  const workbook = new ExcelJS.Workbook();
+  const isCsv = file.mimetype === 'text/csv' || file.originalname?.toLowerCase().endsWith('.csv');
+  if (isCsv) {
+    await workbook.csv.read(Readable.from(file.buffer));
+  } else {
+    await workbook.xlsx.load(file.buffer);
+  }
+
+  const worksheet = workbook.worksheets[0];
+  if (!worksheet) throw new ApiError(400, 'The uploaded file has no readable sheet');
+
+  const headerRow = worksheet.getRow(1);
+  const componentCol = findColumnIndex(headerRow, ['component name', 'component']);
+  const subComponentCol = findColumnIndex(headerRow, [
+    'sub component name',
+    'sub component',
+    'subcomponent',
+  ]);
+  const stockItemCol = findColumnIndex(headerRow, ['stock item', 'item', 'item name']);
+  const supplierCol = findColumnIndex(headerRow, ['supplier name', 'supplier']);
+  const amountCol = findColumnIndex(headerRow, ['amount']);
+  const quantityCol = findColumnIndex(headerRow, ['quantity', 'qty']);
+  const dateCol = findColumnIndex(headerRow, ['date', 'movement date', 'receive date']);
+  const referenceCol = findColumnIndex(headerRow, [
+    'reference / challan no.',
+    'reference / challan no',
+    'reference',
+    'challan no.',
+    'challan no',
+    'reference no',
+    'reference no.',
+  ]);
+  const remarksCol = findColumnIndex(headerRow, ['remarks', 'remark', 'notes']);
+
+  if ((componentCol === -1 && stockItemCol === -1) || supplierCol === -1 || amountCol === -1 || quantityCol === -1) {
+    throw new ApiError(
+      400,
+      'The file must have Component Name (or Stock Item), Supplier Name, Amount, and Quantity columns'
+    );
+  }
+
+  const rows = [];
+  worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+    if (rowNumber === 1) return;
+    const componentName =
+      componentCol === -1 ? '' : String(row.getCell(componentCol).value || '').trim();
+    const subComponentName =
+      subComponentCol === -1 ? '' : String(row.getCell(subComponentCol).value || '').trim();
+    const stockItemLabel =
+      stockItemCol === -1 ? '' : String(row.getCell(stockItemCol).value || '').trim();
+    const supplierName = String(row.getCell(supplierCol).value || '').trim();
+    const amountRaw = row.getCell(amountCol).value;
+    const quantityRaw = row.getCell(quantityCol).value;
+    const amountEmpty = amountRaw == null || String(amountRaw).trim() === '';
+    const quantityEmpty = quantityRaw == null || String(quantityRaw).trim() === '';
+    const amount = qty(amountRaw);
+    const quantity = qty(quantityRaw);
+    const movementDate = normalizeCellDate(dateCol === -1 ? null : row.getCell(dateCol).value);
+    const referenceNo =
+      referenceCol === -1 ? '' : String(row.getCell(referenceCol).value || '').trim();
+    const remarks = remarksCol === -1 ? '' : String(row.getCell(remarksCol).value || '').trim();
+
+    if (!componentName && !stockItemLabel && !supplierName && quantityEmpty && amountEmpty) return;
+    rows.push({
+      rowNumber,
+      componentName,
+      subComponentName,
+      stockItemLabel,
+      supplierName,
+      amount,
+      amountEmpty,
+      quantity,
+      movementDate,
+      referenceNo,
+      remarks,
+    });
+  });
+
+  return rows;
+}
+
+async function bulkImportReceives(file, actorId) {
+  const rows = await parseReceiveWorkbook(file);
+  if (!rows.length) throw new ApiError(400, 'No valid rows found in the uploaded file');
+
+  const items = await stockItemRepository.find(
+    {},
+    { select: 'name sku unit componentName subComponentName quantity amount' }
+  );
+
+  let inserted = 0;
+  const failed = [];
+
+  for (const row of rows) {
+    try {
+      if (!row.supplierName) throw new ApiError(400, 'Supplier name is required');
+      if (row.amountEmpty) throw new ApiError(400, 'Amount is required');
+      if (row.quantity <= 0) throw new ApiError(400, 'Quantity must be greater than 0');
+
+      const item = findStockItemForReceive(items, row);
+      if (!item) {
+        throw new ApiError(
+          400,
+          `Stock item not found for "${row.componentName || row.stockItemLabel}${
+            row.subComponentName ? ` / ${row.subComponentName}` : ''
+          }". Add it in Items first.`
+        );
+      }
+
+      await createMovement(
+        {
+          type: SUPPLIER_IN,
+          stockItem: item._id,
+          supplierName: row.supplierName,
+          amount: row.amount,
+          quantity: row.quantity,
+          movementDate: row.movementDate,
+          referenceNo: row.referenceNo,
+          remarks: row.remarks,
+        },
+        actorId
+      );
+      item.quantity = qty(item.quantity) + row.quantity;
+      item.amount = qty(item.amount) + row.amount;
+      inserted += 1;
+    } catch (err) {
+      failed.push({
+        row: row.rowNumber,
+        message: err.message || 'Failed to import row',
+      });
+    }
+  }
+
+  return {
+    inserted,
+    failed,
+    skipped: failed.length,
+    total: rows.length,
+  };
+}
+
 module.exports = {
   listCatalog,
   createCatalog,
@@ -984,6 +1214,8 @@ module.exports = {
   removeItems,
   buildStockItemsImportTemplate,
   bulkImportItems,
+  buildReceiveImportTemplate,
+  bulkImportReceives,
   listMovements,
   getMovementById,
   createMovement,
