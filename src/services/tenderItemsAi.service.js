@@ -9,13 +9,35 @@ function trimPdfText(text) {
   return `${raw.slice(0, MAX_TEXT_CHARS)}\n\n[Truncated for length]`;
 }
 
+function shortenItemName(name) {
+  let text = String(name || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!text) return '';
+
+  text = text.replace(/^(?:supply|providing|installation|erection)\s+of\s+/i, '').trim();
+  text = text.split(/\s+with the following\b/i)[0];
+  text = text.split(/\s+having the following\b/i)[0];
+  text = text.split(/\s+as per\b/i)[0];
+  text = text.split(/\s+confirming to\b/i)[0];
+  text = text.split(/\s+conforming to\b/i)[0];
+  text = text.split(/\s+\d+\.\s+/)[0]; // cut before numbered specs "1. Frequency…"
+  text = text.replace(/[.;,:]+$/g, '').trim();
+
+  // Keep a concise label; prefer first clause if still very long.
+  if (text.length > 72) {
+    const clause = text.split(/\s+-\s+|\s+–\s+/)[0].trim();
+    text = clause.length >= 8 && clause.length < text.length ? clause : text.slice(0, 72).trim();
+  }
+
+  return text;
+}
+
 function normalizeItems(items) {
   if (!Array.isArray(items)) return [];
   return items
     .map((item) => {
-      const itemName = String(item?.itemName || item?.name || item?.description || '')
-        .replace(/\s+/g, ' ')
-        .trim();
+      const itemName = shortenItemName(item?.itemName || item?.name || item?.description);
       if (!itemName) return null;
 
       const quantityRaw = item?.quantity ?? item?.qty ?? item?.itemQty;
@@ -58,7 +80,7 @@ function extractJsonObject(text) {
   }
 }
 
-const SYSTEM_PROMPT = `You extract line items from Indian railway / government tender PDF text.
+const SYSTEM_PROMPT = `You extract line items from Indian railway / government tender or LOA PDF text.
 Return ONLY valid JSON (no markdown) with this shape:
 {
   "items": [
@@ -70,11 +92,19 @@ Return ONLY valid JSON (no markdown) with this shape:
 
 Rules:
 - Prefer real supply/work item rows. Skip schedule titles, section headers, totals, page numbers, and "At Par" only rows.
-- itemName: use Item Desc / Item Description / Particulars / Name of Work text. Keep it readable; you may shorten very long specs but keep the main item identity.
+- itemName MUST be a short main product/equipment name only (about 2–6 words). Do NOT paste the full technical description, specs, frequency ranges, model clauses, or multi-line Item Desc text.
+- Derive the short name from Item Desc / Item Description / Particulars / Description. Examples of good itemName values:
+  "Monitor Module", "Control Module/Output Module", "Isolator Module", "CO2 - 6.5 Kg",
+  "Control Panel + GSM", "Multi Sensor Detector", "MCP", "ASD", "Hooter",
+  "Unarmoured Cable", "Armoured Cable", "LHS Module", "LHS Cable",
+  "Flexible Conduit - Dia 20mm", "Existing Fire Alarm System".
+- If the description starts with "Supply of …", drop boilerplate and keep the product name (e.g. "true RMS digital multi meter" → "Digital Multimeter").
+- Keep size/capacity in the short name when it defines the product (e.g. "CO2 - 6.5 Kg", "Flexible Conduit - Dia 20mm").
 - quantity: from Item Qty / Qty / Quantity. Numbers only.
 - amount: prefer Bid Amount (Rs) when present; else Advt. Value / Advertised Value / Amount / Total Value. Convert if the column is in lakhs or crores to absolute rupees and set amountUnit accordingly.
 - If a field is missing, use null.
-- Do not invent items that are not in the text.`;
+- Do not invent items that are not in the text.
+- Keep duplicate product rows if the PDF lists them separately (do not merge).`;
 
 async function callGemini(text, apiKey) {
   const model = process.env.GEMINI_MODEL || 'gemini-3.6-flash';

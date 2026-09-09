@@ -3,7 +3,7 @@ const { LOA_TYPES } = require('../config/constants');
 
 const create = [
   body('tenderName').trim().notEmpty().withMessage('Tender Name is required'),
-  body('nitNumber').trim().notEmpty().withMessage('NIT Number is required'),
+  body('nitNumber').optional({ nullable: true }).trim(),
   body('nitDate').optional({ checkFalsy: true }).isISO8601(),
   body('items').optional().isArray(),
   body('items.*.itemName').optional().trim().notEmpty(),
@@ -24,7 +24,7 @@ const create = [
 const update = [
   param('id').isMongoId().withMessage('Invalid tender id'),
   body('tenderName').optional().trim().notEmpty().withMessage('Tender Name is required'),
-  body('nitNumber').optional().trim().notEmpty(),
+  body('nitNumber').optional({ nullable: true }).trim(),
   body('nitDate').optional({ checkFalsy: true }).isISO8601(),
   body('items').optional().isArray(),
   body('items.*.itemName').optional().trim().notEmpty(),

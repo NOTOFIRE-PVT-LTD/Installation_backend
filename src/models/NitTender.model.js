@@ -29,7 +29,7 @@ const loaItemSchema = new Schema(
 const nitTenderSchema = new Schema(
   {
     tenderName: { type: String, required: true, trim: true, index: true },
-    nitNumber: { type: String, required: true, trim: true, index: true },
+    nitNumber: { type: String, default: '', trim: true, index: true },
     nitDate: { type: Date, default: null },
     items: { type: [nitItemSchema], default: [] },
     loaNumber: { type: String, default: '', trim: true },
