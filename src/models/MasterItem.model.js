@@ -12,10 +12,8 @@ const masterItemSchema = new Schema(
     itemCategory: catalogRef(),
     itemName: { type: String, required: true, trim: true },
     itemDescription: { type: String, default: '', trim: true },
-    image: {
-      url: { type: String, default: '' },
-      publicId: { type: String, default: '' },
-    },
+    // Arrays of { url, publicId, resourceType, originalName }. Mixed keeps legacy single-object docs readable.
+    image: { type: Schema.Types.Mixed, default: [] },
     quantity: { type: Number, default: 0, min: 0 },
     qtyType: catalogRef(),
     price: { type: Number, default: 0, min: 0 },
@@ -27,14 +25,8 @@ const masterItemSchema = new Schema(
       longitude: { type: Number, default: null },
       address: { type: String, default: '', trim: true },
     },
-    billPhoto: {
-      url: { type: String, default: '' },
-      publicId: { type: String, default: '' },
-    },
-    visitingCard: {
-      url: { type: String, default: '' },
-      publicId: { type: String, default: '' },
-    },
+    billPhoto: { type: Schema.Types.Mixed, default: [] },
+    visitingCard: { type: Schema.Types.Mixed, default: [] },
     isActive: { type: Boolean, default: true, index: true },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     updatedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },

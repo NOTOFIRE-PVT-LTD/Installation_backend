@@ -175,13 +175,29 @@ async function listItems(query) {
   const migratedItems = await Promise.all(
     items.map(async (entry) => {
       const legacy = await migrateLegacyCatalogFields(entry);
-      return migrateItemNameField(legacy);
+      const named = await migrateItemNameField(legacy);
+      return migrateAttachmentFields(named);
     })
   );
   const populatedItems = await Promise.all(
-    migratedItems.map((entry) => masterItemRepository.findById(entry._id, { populate: ITEM_POPULATE }))
+    migratedItems.map(async (entry) => {
+      const populated = await masterItemRepository.findById(entry._id, { populate: ITEM_POPULATE });
+      const plain = populated?.toObject ? populated.toObject() : populated;
+      if (!plain) return null;
+      return {
+        ...plain,
+        image: normalizeAttachmentList(plain.image),
+        billPhoto: normalizeAttachmentList(plain.billPhoto),
+        visitingCard: normalizeAttachmentList(plain.visitingCard),
+      };
+    })
   );
-  return buildPaginatedResult({ items: populatedItems, total, page, pageSize });
+  return buildPaginatedResult({
+    items: populatedItems.filter(Boolean),
+    total,
+    page,
+    pageSize,
+  });
 }
 
 async function getItemById(id) {
@@ -189,7 +205,16 @@ async function getItemById(id) {
   if (!item) throw new ApiError(404, 'Item not found');
   await migrateLegacyCatalogFields(item);
   await migrateItemNameField(item);
-  return masterItemRepository.findById(id, { populate: ITEM_POPULATE });
+  await migrateAttachmentFields(item);
+  const populated = await masterItemRepository.findById(id, { populate: ITEM_POPULATE });
+  if (!populated) throw new ApiError(404, 'Item not found');
+  const plain = populated.toObject ? populated.toObject() : populated;
+  return {
+    ...plain,
+    image: normalizeAttachmentList(plain.image),
+    billPhoto: normalizeAttachmentList(plain.billPhoto),
+    visitingCard: normalizeAttachmentList(plain.visitingCard),
+  };
 }
 
 function parseLocation(data) {
@@ -206,13 +231,89 @@ function parseLocation(data) {
   }
 }
 
-async function uploadMasterImage(file) {
-  if (!file) return { url: '', publicId: '' };
-  return uploadService.uploadImageBuffer(file.buffer);
+async function uploadMasterAttachment(file) {
+  if (!file) return null;
+  if (file.mimetype === 'application/pdf') {
+    const uploaded = await uploadService.uploadDocumentBuffer(file.buffer);
+    return {
+      url: uploaded.url,
+      publicId: uploaded.publicId,
+      resourceType: 'raw',
+      originalName: file.originalname || '',
+    };
+  }
+  const uploaded = await uploadService.uploadImageBuffer(file.buffer);
+  return {
+    url: uploaded.url,
+    publicId: uploaded.publicId,
+    resourceType: 'image',
+    originalName: file.originalname || '',
+  };
 }
 
-async function deleteMasterImage(image) {
-  if (image?.publicId) await uploadService.deleteAsset(image.publicId);
+async function uploadMasterAttachments(files = []) {
+  const results = await Promise.all((files || []).map((file) => uploadMasterAttachment(file)));
+  return results.filter(Boolean);
+}
+
+async function deleteMasterAttachment(file) {
+  if (!file?.publicId) return;
+  await uploadService.deleteAsset(file.publicId, file.resourceType || 'image');
+}
+
+function normalizeAttachmentList(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value
+      .filter((entry) => entry && entry.url)
+      .map((entry) => ({
+        url: entry.url || '',
+        publicId: entry.publicId || '',
+        resourceType: entry.resourceType || 'image',
+        originalName: entry.originalName || '',
+      }));
+  }
+  if (typeof value === 'object' && value.url) {
+    return [
+      {
+        url: value.url || '',
+        publicId: value.publicId || '',
+        resourceType: value.resourceType || 'image',
+        originalName: value.originalName || '',
+      },
+    ];
+  }
+  return [];
+}
+
+function parseRemovePublicIds(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.map(String).filter(Boolean);
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed)) return parsed.map(String).filter(Boolean);
+  } catch {
+    // fall through
+  }
+  return String(value)
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean);
+}
+
+async function migrateAttachmentFields(item) {
+  if (!item?._id) return item;
+  const updates = {};
+  ['image', 'billPhoto', 'visitingCard'].forEach((field) => {
+    const value = item[field];
+    if (!value || Array.isArray(value)) return;
+    if (typeof value === 'object' && value.url) {
+      updates[field] = normalizeAttachmentList(value);
+    }
+  });
+  if (!Object.keys(updates).length) return item;
+  await masterItemRepository.updateById(item._id, updates);
+  return masterItemRepository.findById(item._id);
 }
 
 function buildPayload(data) {
@@ -229,34 +330,32 @@ function buildPayload(data) {
   };
 }
 
+async function mergeAttachments(existingList, newFiles, removeIds) {
+  const existing = normalizeAttachmentList(existingList);
+  const removeSet = new Set(removeIds || []);
+  const kept = existing.filter((file) => !removeSet.has(String(file.publicId || '')));
+  const removed = existing.filter((file) => removeSet.has(String(file.publicId || '')));
+  await Promise.all(removed.map((file) => deleteMasterAttachment(file)));
+  const uploaded = await uploadMasterAttachments(newFiles);
+  return [...kept, ...uploaded];
+}
+
 async function applyAttachmentUpdates(existing, data, files, update) {
-  const itemImage = files?.itemImage?.[0];
-  const billPhoto = files?.billPhoto?.[0];
-  const visitingCard = files?.visitingCard?.[0];
-
-  if (itemImage) {
-    update.image = await uploadMasterImage(itemImage);
-    await deleteMasterImage(existing.image);
-  } else if (data.removeImage === 'true' || data.removeImage === true) {
-    update.image = { url: '', publicId: '' };
-    await deleteMasterImage(existing.image);
-  }
-
-  if (billPhoto) {
-    update.billPhoto = await uploadMasterImage(billPhoto);
-    await deleteMasterImage(existing.billPhoto);
-  } else if (data.removeBillPhoto === 'true' || data.removeBillPhoto === true) {
-    update.billPhoto = { url: '', publicId: '' };
-    await deleteMasterImage(existing.billPhoto);
-  }
-
-  if (visitingCard) {
-    update.visitingCard = await uploadMasterImage(visitingCard);
-    await deleteMasterImage(existing.visitingCard);
-  } else if (data.removeVisitingCard === 'true' || data.removeVisitingCard === true) {
-    update.visitingCard = { url: '', publicId: '' };
-    await deleteMasterImage(existing.visitingCard);
-  }
+  update.image = await mergeAttachments(
+    existing.image,
+    files?.itemImage || [],
+    parseRemovePublicIds(data.removeItemImageIds)
+  );
+  update.billPhoto = await mergeAttachments(
+    existing.billPhoto,
+    files?.billPhoto || [],
+    parseRemovePublicIds(data.removeBillPhotoIds)
+  );
+  update.visitingCard = await mergeAttachments(
+    existing.visitingCard,
+    files?.visitingCard || [],
+    parseRemovePublicIds(data.removeVisitingCardIds)
+  );
 }
 
 async function createItem(data, files, actorId) {
@@ -277,9 +376,9 @@ async function createItem(data, files, actorId) {
   const created = await masterItemRepository.create({
     ...payload,
     ...catalog,
-    image: await uploadMasterImage(files?.itemImage?.[0]),
-    billPhoto: await uploadMasterImage(files?.billPhoto?.[0]),
-    visitingCard: await uploadMasterImage(files?.visitingCard?.[0]),
+    image: await uploadMasterAttachments(files?.itemImage || []),
+    billPhoto: await uploadMasterAttachments(files?.billPhoto || []),
+    visitingCard: await uploadMasterAttachments(files?.visitingCard || []),
     isActive: data.isActive === undefined ? true : data.isActive === 'true' || data.isActive === true,
     createdBy: actorId,
     updatedBy: actorId,
@@ -290,6 +389,7 @@ async function createItem(data, files, actorId) {
 async function updateItem(id, data, files, actorId) {
   const existing = await masterItemRepository.findById(id);
   if (!existing) throw new ApiError(404, 'Item not found');
+  await migrateAttachmentFields(existing);
 
   const payload = buildPayload(data);
   if (!payload.itemName) throw new ApiError(400, 'Item name is required');
@@ -305,10 +405,11 @@ async function updateItem(id, data, files, actorId) {
     actorId,
   });
 
+  const fresh = await masterItemRepository.findById(id);
   const update = { ...payload, ...catalog, updatedBy: actorId };
   if (data.isActive !== undefined) update.isActive = data.isActive === 'true' || data.isActive === true;
 
-  await applyAttachmentUpdates(existing, data, files, update);
+  await applyAttachmentUpdates(fresh, data, files, update);
   await masterItemRepository.updateById(id, update);
   return getItemById(id);
 }
@@ -316,9 +417,11 @@ async function updateItem(id, data, files, actorId) {
 async function removeItem(id) {
   const existing = await masterItemRepository.findById(id);
   if (!existing) throw new ApiError(404, 'Item not found');
-  await deleteMasterImage(existing.image);
-  await deleteMasterImage(existing.billPhoto);
-  await deleteMasterImage(existing.visitingCard);
+  await Promise.all([
+    ...normalizeAttachmentList(existing.image).map((file) => deleteMasterAttachment(file)),
+    ...normalizeAttachmentList(existing.billPhoto).map((file) => deleteMasterAttachment(file)),
+    ...normalizeAttachmentList(existing.visitingCard).map((file) => deleteMasterAttachment(file)),
+  ]);
   await masterItemRepository.deleteById(id);
   return { _id: id };
 }

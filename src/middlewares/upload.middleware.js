@@ -17,6 +17,9 @@ const MIXED_FIELDS = [
   'firmCallLetter',
   'otherDetailsFiles',
   'docs',
+  'itemImage',
+  'billPhoto',
+  'visitingCard',
 ];
 const MIXED_MIME_TYPES = [...IMAGE_MIME_TYPES, ...DOCUMENT_MIME_TYPES];
 
@@ -109,9 +112,9 @@ const uploadDailyReportMedia = upload.fields([
 const uploadStockItemFiles = upload.fields([{ name: 'docs', maxCount: 20 }]);
 
 const uploadMasterItemFiles = upload.fields([
-  { name: 'itemImage', maxCount: 1 },
-  { name: 'billPhoto', maxCount: 1 },
-  { name: 'visitingCard', maxCount: 1 },
+  { name: 'itemImage', maxCount: 10 },
+  { name: 'billPhoto', maxCount: 10 },
+  { name: 'visitingCard', maxCount: 10 },
 ]);
 
 module.exports = {
