@@ -5,7 +5,7 @@ const { REPORT_STATUS, PAYMENT_STATUS, CLAIM_STATUS, ROLES } = require('../confi
 
 function projectScopeFilter(user) {
   if (user?.role === ROLES.USER) {
-    return { assignedInstaller: user._id };
+    return { $or: [{ assignedInstallers: user._id }, { assignedInstaller: user._id }] };
   }
   return {};
 }

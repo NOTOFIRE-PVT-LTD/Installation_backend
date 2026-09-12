@@ -6,7 +6,7 @@ const { ROLES } = require('../config/constants');
 
 function projectScopeFilter(user) {
   if (user?.role === ROLES.USER) {
-    return { assignedInstaller: user._id };
+    return { $or: [{ assignedInstallers: user._id }, { assignedInstaller: user._id }] };
   }
   return {};
 }

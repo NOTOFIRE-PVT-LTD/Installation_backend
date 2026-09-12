@@ -20,6 +20,7 @@ const stockRoutes = require('./stock.routes');
 const bomRoutes = require('./bom.routes');
 const itemMasterRoutes = require('./itemMaster.routes');
 const uploadRoutes = require('./upload.routes');
+const billingRoutes = require('./billing.routes');
 
 const router = express.Router();
 
@@ -44,5 +45,6 @@ router.use('/stock', stockRoutes);
 router.use('/bom', bomRoutes);
 router.use('/item-master', itemMasterRoutes);
 router.use('/uploads', uploadRoutes);
+router.use('/billing', billingRoutes);
 
 module.exports = router;

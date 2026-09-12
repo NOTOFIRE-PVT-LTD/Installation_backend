@@ -106,6 +106,8 @@ const projectSchema = new Schema(
   {
     projectName: { type: String, required: true, trim: true },
     installerName: { type: String, required: true, trim: true },
+    // New multi-assign field. Legacy `assignedInstaller` (single) is still read for older projects.
+    assignedInstallers: [{ type: Schema.Types.ObjectId, ref: 'User' }],
     assignedInstaller: { type: Schema.Types.ObjectId, ref: 'User', default: null, index: true },
     contractor: { type: String, required: true, trim: true },
     invoiceNoDateSupply: { type: String, default: '', trim: true },

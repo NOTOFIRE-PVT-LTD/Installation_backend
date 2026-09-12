@@ -10,7 +10,23 @@ const jsonFields = ['totalUnits', 'loaItems', 'railwayOfficers', 'additionalOffi
 
 const create = [
   body('projectName').trim().notEmpty().withMessage('Project name is required'),
-  body('assignedInstaller').isMongoId().withMessage('Assigned installer is required'),
+  body('assignedInstallers').custom((value, { req }) => {
+    let raw = value !== undefined && value !== '' ? value : req.body.assignedInstaller;
+    if (raw == null || raw === '') throw new Error('Assign at least one installer');
+    if (typeof raw === 'string') {
+      try {
+        raw = JSON.parse(raw);
+      } catch {
+        raw = raw.includes(',') ? raw.split(',') : [raw];
+      }
+    }
+    if (!Array.isArray(raw)) raw = [raw];
+    const ids = raw.map(String).filter((id) => /^[a-f\d]{24}$/i.test(String(id).trim()));
+    if (!ids.length) throw new Error('Assign at least one installer');
+    req.body.assignedInstallers = JSON.stringify(ids);
+    return true;
+  }),
+  body('assignedInstaller').optional(),
   body('contractor').trim().notEmpty().withMessage('Contractor is required'),
   body('railwayZone').trim().notEmpty().withMessage('Railway zone is required'),
   body('serialType').optional().isIn(['LHS/ASD', 'ALL']).withMessage('Invalid serial type'),
@@ -29,7 +45,26 @@ const create = [
 const update = [
   param('id').isMongoId().withMessage('Invalid project id'),
   body('projectName').optional().trim().notEmpty(),
-  body('assignedInstaller').optional().isMongoId().withMessage('Invalid assigned installer'),
+  body('assignedInstallers')
+    .optional()
+    .custom((value, { req }) => {
+      if (value === undefined && req.body.assignedInstaller === undefined) return true;
+      let raw = value !== undefined ? value : req.body.assignedInstaller;
+      if (raw == null || raw === '') throw new Error('Assign at least one installer');
+      if (typeof raw === 'string') {
+        try {
+          raw = JSON.parse(raw);
+        } catch {
+          raw = raw.includes(',') ? raw.split(',') : [raw];
+        }
+      }
+      if (!Array.isArray(raw)) raw = [raw];
+      const ids = raw.map(String).filter((id) => /^[a-f\d]{24}$/i.test(id.trim()));
+      if (!ids.length) throw new Error('Assign at least one installer');
+      req.body.assignedInstallers = JSON.stringify(ids);
+      return true;
+    }),
+  body('assignedInstaller').optional(),
   body('contractor').optional().trim().notEmpty(),
   body('railwayZone').optional().trim().notEmpty(),
   body('serialType').optional().isIn(['LHS/ASD', 'ALL']).withMessage('Invalid serial type'),

@@ -100,7 +100,7 @@ function pickFields(data, { isAdmin = false } = {}) {
 
 function applyProjectScopeFilter(filter, user) {
   if (user?.role === ROLES.USER) {
-    filter.assignedInstaller = user._id;
+    filter.$or = [{ assignedInstallers: user._id }, { assignedInstaller: user._id }];
   }
   return filter;
 }
@@ -124,33 +124,77 @@ function buildPanelSerialNo({ serialType, panelSerialStart, panelSerialEnd, pane
   return String(panelSerialNo || '').trim();
 }
 
+function parseInstallerIds(data = {}) {
+  let raw = data.assignedInstallers !== undefined ? data.assignedInstallers : data.assignedInstaller;
+  if (raw == null || raw === '') return [];
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed) return [];
+    try {
+      const parsed = JSON.parse(trimmed);
+      raw = parsed;
+    } catch {
+      raw = trimmed.includes(',') ? trimmed.split(',') : [trimmed];
+    }
+  }
+  if (!Array.isArray(raw)) raw = [raw];
+  return [
+    ...new Set(
+      raw
+        .map((value) => {
+          if (value == null) return '';
+          if (typeof value === 'object') return String(value._id || value.id || '').trim();
+          return String(value).trim();
+        })
+        .filter((id) => /^[a-f\d]{24}$/i.test(id))
+    ),
+  ];
+}
+
+function getAssignedInstallerIds(project) {
+  const fromNew = Array.isArray(project?.assignedInstallers) ? project.assignedInstallers : [];
+  const ids = fromNew
+    .map((value) => String(value?._id || value || '').trim())
+    .filter((id) => /^[a-f\d]{24}$/i.test(id));
+  if (ids.length) return [...new Set(ids)];
+  const legacy = project?.assignedInstaller;
+  if (!legacy) return [];
+  const legacyId = String(legacy?._id || legacy || '').trim();
+  return /^[a-f\d]{24}$/i.test(legacyId) ? [legacyId] : [];
+}
+
 function assertProjectAccess(project, user) {
   if (!project || !user || user.role !== ROLES.USER) return;
-  const assigned = project.assignedInstaller?.toString?.() || String(project.assignedInstaller || '');
-  if (!assigned || assigned !== user._id.toString()) {
+  const assigned = getAssignedInstallerIds(project);
+  if (!assigned.includes(String(user._id))) {
     throw new ApiError(403, 'You do not have access to this project');
   }
 }
 
 async function resolveInstallerAssignment(data, { required = false } = {}) {
-  const id = data.assignedInstaller;
-  if (!id) {
-    if (required) throw new ApiError(400, 'Assigned installer is required');
+  const ids = parseInstallerIds(data);
+  if (!ids.length) {
+    if (required) throw new ApiError(400, 'Assign at least one installer');
     return {};
   }
 
-  const installer = await userRepository.findById(id);
-  if (!installer) throw new ApiError(400, 'Selected user not found');
-  if (installer.role !== ROLES.USER) {
-    throw new ApiError(400, 'Assigned installer must be a user with installer role');
-  }
-  if (installer.status !== USER_STATUS.ACTIVE) {
-    throw new ApiError(400, 'Selected user must be active');
+  const installers = [];
+  for (const id of ids) {
+    const installer = await userRepository.findById(id);
+    if (!installer) throw new ApiError(400, 'Selected user not found');
+    if (installer.role !== ROLES.USER) {
+      throw new ApiError(400, 'Assigned installer must be a user with installer role');
+    }
+    if (installer.status !== USER_STATUS.ACTIVE) {
+      throw new ApiError(400, 'Selected user must be active');
+    }
+    installers.push(installer);
   }
 
   return {
-    assignedInstaller: installer._id,
-    installerName: installer.name,
+    assignedInstallers: installers.map((installer) => installer._id),
+    assignedInstaller: installers[0]._id,
+    installerName: installers.map((installer) => installer.name).filter(Boolean).join(', '),
   };
 }
 
@@ -159,6 +203,9 @@ function sanitizeProjectForUser(project, user) {
   if (user?.role !== ROLES.ADMIN) {
     delete doc.installerRatings;
   }
+  const ids = getAssignedInstallerIds(doc);
+  doc.assignedInstallers = ids;
+  doc.assignedInstaller = ids[0] || null;
   return doc;
 }
 
@@ -169,22 +216,19 @@ async function list(query, user) {
   const scope = {};
   applyProjectScopeFilter(scope, user);
 
-  const filter = { ...scope };
+  let filter = { ...scope };
   if (query.search) {
     const regex = new RegExp(query.search, 'i');
-    filter.$and = [
-      scope,
-      {
-        $or: [
-          { projectName: regex },
-          { installerName: regex },
-          { contractor: regex },
-          { panelSerialNo: regex },
-          { railwayZone: regex },
-        ],
-      },
-    ];
-    delete filter.assignedInstaller;
+    const searchClause = {
+      $or: [
+        { projectName: regex },
+        { installerName: regex },
+        { contractor: regex },
+        { panelSerialNo: regex },
+        { railwayZone: regex },
+      ],
+    };
+    filter = Object.keys(scope).length ? { $and: [scope, searchClause] } : searchClause;
   }
 
   const { items, total } = await projectRepository.paginate({ filter, sort, skip, limit: pageSize });
@@ -269,7 +313,7 @@ async function update(id, data, files, actorId, user) {
     updates.panelSerialNo = panelSerialNo;
   }
 
-  if (data.assignedInstaller !== undefined) {
+  if (data.assignedInstaller !== undefined || data.assignedInstallers !== undefined) {
     Object.assign(updates, await resolveInstallerAssignment(data, { required: true }));
   }
 

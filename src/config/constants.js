@@ -54,6 +54,7 @@ const PERMISSION_KEYS = Object.freeze([
   'stockItems',
   'bom',
   'itemsMaster',
+  'billing',
 ]);
 
 const STOCK_MOVEMENT_TYPES = Object.freeze({
