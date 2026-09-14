@@ -249,6 +249,23 @@ async function fetchProjectById(id) {
 async function getById(id, user) {
   const project = await fetchProjectById(id);
   assertProjectAccess(project, user);
+
+  // Backfill Materials Used from project LOA items for stations that never got them.
+  const loaMaterials = materialsFromLoaItems(project.loaItems);
+  if (loaMaterials.length > 0) {
+    let dirty = false;
+    (project.stations || []).forEach((station) => {
+      if (!Array.isArray(station.materials) || station.materials.length === 0) {
+        station.materials = loaMaterials.map((row) => ({ ...row }));
+        dirty = true;
+      }
+    });
+    if (dirty) {
+      project.markModified('stations');
+      await project.save();
+    }
+  }
+
   return sanitizeProjectForUser(project, user);
 }
 
@@ -329,6 +346,15 @@ async function update(id, data, files, actorId, user) {
   if (videoFiles.length > 0) {
     await Promise.all(project.commissioningVideos.map((v) => uploadService.deleteAsset(v.publicId, 'video')));
     updates.commissioningVideos = await Promise.all(videoFiles.map((f) => uploadService.uploadVideoBuffer(f.buffer)));
+  }
+
+  // Keep Materials Used on every station aligned with project LOA items.
+  if (data.loaItems !== undefined && updates.loaItems !== undefined) {
+    Object.assign(project, updates);
+    syncStationMaterialsFromLoa(project);
+    project.markModified('stations');
+    await project.save();
+    return getById(id, user);
   }
 
   await projectRepository.updateById(id, updates);
@@ -418,6 +444,23 @@ function parseIdList(raw) {
   }
 }
 
+function materialsFromLoaItems(loaItems = []) {
+  return (Array.isArray(loaItems) ? loaItems : [])
+    .filter((row) => String(row?.item || '').trim())
+    .map((row) => ({
+      item: String(row.item).trim(),
+      qty: Math.max(0, Number(row.qty) || 0),
+      unit: String(row.unit || 'Nos').trim() || 'Nos',
+    }));
+}
+
+function syncStationMaterialsFromLoa(project) {
+  const materials = materialsFromLoaItems(project.loaItems);
+  (project.stations || []).forEach((station) => {
+    station.materials = materials.map((row) => ({ ...row }));
+  });
+}
+
 async function addStation(projectId, data, files, actorId, user) {
   const project = await fetchProjectById(projectId);
   assertProjectAccess(project, user);
@@ -427,6 +470,10 @@ async function addStation(projectId, data, files, actorId, user) {
 
   const newStation = { name: data.name };
   applyStationFields(newStation, data);
+  // Every station starts with the same LOA materials list (item + qty) from the project.
+  if (!Array.isArray(newStation.materials) || newStation.materials.length === 0) {
+    newStation.materials = materialsFromLoaItems(project.loaItems);
+  }
   newStation.completePhotos = await Promise.all(completeFiles.map((f) => uploadService.uploadImageBuffer(f.buffer)));
   newStation.remainingPhotos = await Promise.all(remainingFiles.map((f) => uploadService.uploadImageBuffer(f.buffer)));
 

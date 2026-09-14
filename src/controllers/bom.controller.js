@@ -27,6 +27,24 @@ const removeBom = asyncHandler(async (req, res) => {
   sendSuccess(res, { message: 'BOM deleted' });
 });
 
+const downloadComponentsImportTemplate = asyncHandler(async (_req, res) => {
+  const buffer = await bomService.buildComponentsImportTemplate();
+  res.setHeader(
+    'Content-Type',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  );
+  res.setHeader(
+    'Content-Disposition',
+    'attachment; filename="bom-components-import-template.xlsx"'
+  );
+  res.send(buffer);
+});
+
+const importComponents = asyncHandler(async (req, res) => {
+  const result = await bomService.importComponentsPreview(req.file);
+  sendSuccess(res, { message: 'BOM components parsed', data: result });
+});
+
 const previewProduction = asyncHandler(async (req, res) => {
   const preview = await bomService.previewProduction(req.body);
   sendSuccess(res, { message: 'BOM production preview', data: preview });
@@ -53,6 +71,8 @@ module.exports = {
   createBom,
   updateBom,
   removeBom,
+  downloadComponentsImportTemplate,
+  importComponents,
   previewProduction,
   confirmProduction,
   listProductions,

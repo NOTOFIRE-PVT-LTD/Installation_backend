@@ -1,4 +1,6 @@
 const mongoose = require('mongoose');
+const { Readable } = require('stream');
+const ExcelJS = require('exceljs');
 const bomRepository = require('../repositories/bom.repository');
 const bomProductionRepository = require('../repositories/bomProduction.repository');
 const stockItemRepository = require('../repositories/stockItem.repository');
@@ -335,6 +337,217 @@ async function getProductionById(id) {
   return production;
 }
 
+function cellText(value) {
+  if (value == null) return '';
+  if (typeof value === 'object') {
+    if (value.text != null) return String(value.text).trim();
+    if (value.result != null) return String(value.result).trim();
+    if (Array.isArray(value.richText)) {
+      return value.richText.map((part) => part.text || '').join('').trim();
+    }
+  }
+  return String(value).trim();
+}
+
+function findColumnIndex(headerRow, names) {
+  let index = -1;
+  headerRow.eachCell({ includeEmpty: false }, (cell, colNumber) => {
+    const value = cellText(cell.value).toLowerCase();
+    if (names.includes(value) && index === -1) index = colNumber;
+  });
+  return index;
+}
+
+function normalizeKey(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+async function buildComponentsImportTemplate() {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('BOM Components');
+  sheet.columns = [
+    { header: 'Components', key: 'component', width: 28 },
+    { header: 'Part No.', key: 'partNo', width: 18 },
+    { header: 'Qty Req. for 1 pcs.', key: 'qtyPerPcs', width: 22 },
+  ];
+  sheet.getRow(1).font = { bold: true };
+  sheet.addRow({
+    component: 'Fire Alarm Control Panel',
+    partNo: 'FACP-001',
+    qtyPerPcs: 1,
+  });
+  sheet.addRow({
+    component: 'Smoke Detector',
+    partNo: 'SD-100',
+    qtyPerPcs: 4,
+  });
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+}
+
+async function parseComponentsWorkbook(file) {
+  if (!file?.buffer) throw new ApiError(400, 'Upload an Excel file');
+
+  const workbook = new ExcelJS.Workbook();
+  const isCsv = file.mimetype === 'text/csv' || file.originalname?.toLowerCase().endsWith('.csv');
+  if (isCsv) {
+    await workbook.csv.read(Readable.from(file.buffer));
+  } else {
+    await workbook.xlsx.load(file.buffer);
+  }
+
+  const worksheet = workbook.worksheets[0];
+  if (!worksheet) throw new ApiError(400, 'The uploaded file has no readable sheet');
+
+  const headerRow = worksheet.getRow(1);
+  const componentCol = findColumnIndex(headerRow, [
+    'components',
+    'component',
+    'component name',
+    'item',
+    'item name',
+  ]);
+  const partNoCol = findColumnIndex(headerRow, [
+    'part no.',
+    'part no',
+    'part number',
+    'partnumber',
+    'sku',
+  ]);
+  const qtyCol = findColumnIndex(headerRow, [
+    'qty req. for 1 pcs.',
+    'qty req. for 1 pcs',
+    'qty required for 1 pcs',
+    'qty for 1 pcs',
+    'qty / 1 pcs',
+    'qty per pcs',
+    'qty',
+    'quantity',
+  ]);
+
+  if (componentCol === -1 && partNoCol === -1) {
+    throw new ApiError(400, 'The file must have Components and/or Part No. columns');
+  }
+  if (qtyCol === -1) {
+    throw new ApiError(400, 'The file must have a Qty Req. for 1 pcs. column');
+  }
+
+  const rows = [];
+  worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+    if (rowNumber === 1) return;
+    const component = componentCol === -1 ? '' : cellText(row.getCell(componentCol).value);
+    const partNo = partNoCol === -1 ? '' : cellText(row.getCell(partNoCol).value);
+    const qtyRaw = row.getCell(qtyCol).value;
+    const qtyEmpty = qtyRaw == null || cellText(qtyRaw) === '';
+    if (!component && !partNo && qtyEmpty) return;
+    rows.push({
+      rowNumber,
+      component,
+      partNo,
+      qtyPerPcs: qty(qtyRaw),
+      qtyEmpty,
+    });
+  });
+
+  return rows;
+}
+
+function resolveStockItem(row, stockItems) {
+  const partKey = normalizeKey(row.partNo);
+  const componentKey = normalizeKey(row.component);
+
+  if (partKey) {
+    const bySku = stockItems.filter((item) => normalizeKey(item.sku) === partKey);
+    if (bySku.length === 1) return bySku[0];
+    if (bySku.length > 1 && componentKey) {
+      const narrowed = bySku.filter(
+        (item) =>
+          normalizeKey(item.componentName) === componentKey ||
+          normalizeKey(item.name) === componentKey ||
+          normalizeKey(item.subComponentName) === componentKey
+      );
+      if (narrowed.length === 1) return narrowed[0];
+    }
+    if (bySku.length > 1) {
+      throw new Error(`Multiple stock items match Part No. "${row.partNo}"`);
+    }
+  }
+
+  if (componentKey) {
+    const exact = stockItems.filter(
+      (item) =>
+        normalizeKey(item.componentName) === componentKey ||
+        normalizeKey(item.name) === componentKey ||
+        normalizeKey(item.subComponentName) === componentKey
+    );
+    if (exact.length === 1) return exact[0];
+    if (exact.length > 1) {
+      throw new Error(
+        `Multiple stock items match "${row.component}". Add Part No. to identify the item.`
+      );
+    }
+  }
+
+  const label = [row.component, row.partNo].filter(Boolean).join(' / ') || 'row';
+  throw new Error(`No stock item found for ${label}`);
+}
+
+/**
+ * Parse BOM components Excel and resolve each row to an existing stock item.
+ * Does not create a BOM — returns matched lines for the create/edit form.
+ */
+async function importComponentsPreview(file) {
+  const rows = await parseComponentsWorkbook(file);
+  if (rows.length === 0) {
+    throw new ApiError(400, 'No valid rows found in the uploaded file');
+  }
+
+  const stockItems = await stockItemRepository.find(
+    {},
+    { select: 'name sku unit categoryName componentName subComponentName' }
+  );
+
+  const components = [];
+  const failed = [];
+  const seen = new Set();
+
+  for (const row of rows) {
+    try {
+      if (row.qtyEmpty || row.qtyPerPcs <= 0) {
+        throw new Error('Qty Req. for 1 pcs. must be greater than 0');
+      }
+      if (!row.component && !row.partNo) {
+        throw new Error('Components or Part No. is required');
+      }
+
+      const item = resolveStockItem(row, stockItems);
+      const key = String(item._id);
+      if (seen.has(key)) {
+        throw new Error(`Duplicate component "${itemDisplayName(item)}" in file`);
+      }
+      seen.add(key);
+
+      components.push({
+        stockItem: item._id,
+        qtyPerPcs: row.qtyPerPcs,
+        label: itemDisplayName(item),
+        partNo: item.sku || row.partNo || '',
+        component: row.component || item.componentName || item.name,
+      });
+    } catch (err) {
+      failed.push({ row: row.rowNumber, message: err.message || 'Invalid row' });
+    }
+  }
+
+  return {
+    total: rows.length,
+    inserted: components.length,
+    skipped: failed.length,
+    components,
+    failed,
+  };
+}
+
 module.exports = {
   listBoms,
   getBomById,
@@ -345,4 +558,6 @@ module.exports = {
   confirmProduction,
   listProductions,
   getProductionById,
+  buildComponentsImportTemplate,
+  importComponentsPreview,
 };

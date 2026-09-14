@@ -6,6 +6,7 @@ const { requirePermission } = require('../middlewares/permission.middleware');
 const validate = require('../middlewares/validate.middleware');
 const bomValidator = require('../validators/bom.validator');
 const { ROLES } = require('../config/constants');
+const { uploadSpreadsheet } = require('../middlewares/upload.middleware');
 
 const router = express.Router();
 
@@ -13,6 +14,8 @@ router.use(authenticate, requireRole(ROLES.ADMIN), requirePermission('bom'));
 
 router.get('/', validate(bomValidator.bomList), bomController.listBoms);
 router.post('/', validate(bomValidator.bomCreate), bomController.createBom);
+router.get('/components/import-template', bomController.downloadComponentsImportTemplate);
+router.post('/components/import', uploadSpreadsheet, bomController.importComponents);
 router.get('/productions', validate(bomValidator.productionList), bomController.listProductions);
 router.get('/productions/:id', validate(bomValidator.productionIdParam), bomController.getProductionById);
 router.post('/productions/preview', validate(bomValidator.productionPreview), bomController.previewProduction);
