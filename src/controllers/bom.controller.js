@@ -65,6 +65,11 @@ const getProductionById = asyncHandler(async (req, res) => {
   sendSuccess(res, { message: 'BOM production fetched', data: production });
 });
 
+const removeProduction = asyncHandler(async (req, res) => {
+  await bomService.removeProduction(req.params.id);
+  sendSuccess(res, { message: 'BOM production deleted' });
+});
+
 module.exports = {
   listBoms,
   getBomById,
@@ -77,4 +82,5 @@ module.exports = {
   confirmProduction,
   listProductions,
   getProductionById,
+  removeProduction,
 };

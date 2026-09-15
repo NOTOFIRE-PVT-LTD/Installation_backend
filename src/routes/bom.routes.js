@@ -18,6 +18,7 @@ router.get('/components/import-template', bomController.downloadComponentsImport
 router.post('/components/import', uploadSpreadsheet, bomController.importComponents);
 router.get('/productions', validate(bomValidator.productionList), bomController.listProductions);
 router.get('/productions/:id', validate(bomValidator.productionIdParam), bomController.getProductionById);
+router.delete('/productions/:id', validate(bomValidator.productionIdParam), bomController.removeProduction);
 router.post('/productions/preview', validate(bomValidator.productionPreview), bomController.previewProduction);
 router.post('/productions/confirm', validate(bomValidator.productionConfirm), bomController.confirmProduction);
 router.get('/:id', validate(bomValidator.bomIdParam), bomController.getBomById);

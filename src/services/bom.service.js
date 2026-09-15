@@ -337,6 +337,23 @@ async function getProductionById(id) {
   return production;
 }
 
+async function removeProduction(id) {
+  const production = await bomProductionRepository.findById(id);
+  if (!production) throw new ApiError(404, 'BOM production not found');
+
+  const movementIds = (production.movements || []).map((m) => String(m._id || m)).filter(Boolean);
+  for (const movementId of movementIds) {
+    try {
+      await stockService.removeMovement(movementId);
+    } catch (err) {
+      // Movement already gone — still allow deleting the production record.
+      if (err.statusCode !== 404) throw err;
+    }
+  }
+
+  await bomProductionRepository.deleteById(id);
+}
+
 function cellText(value) {
   if (value == null) return '';
   if (typeof value === 'object') {
@@ -558,6 +575,7 @@ module.exports = {
   confirmProduction,
   listProductions,
   getProductionById,
+  removeProduction,
   buildComponentsImportTemplate,
   importComponentsPreview,
 };
