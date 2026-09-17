@@ -32,4 +32,17 @@ const recentActivity = asyncHandler(async (req, res) => {
   sendSuccess(res, { message: 'Recent activity fetched', data });
 });
 
-module.exports = { stats, projectProgress, projectsOverview, dailyFeed, recentReports, recentActivity };
+const materialStatusOverview = asyncHandler(async (req, res) => {
+  const data = await dashboardService.getMaterialStatusOverview(req.user);
+  sendSuccess(res, { message: 'Material status overview fetched', data });
+});
+
+module.exports = {
+  stats,
+  projectProgress,
+  projectsOverview,
+  dailyFeed,
+  recentReports,
+  recentActivity,
+  materialStatusOverview,
+};

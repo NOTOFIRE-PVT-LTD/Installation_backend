@@ -131,11 +131,215 @@ async function getProjectProgress() {
   return results;
 }
 
+function stationMaterialBucket(station) {
+  if (!station) return 'pending';
+  if (
+    station.commissioningDate ||
+    station.claimStatus === CLAIM_STATUS.APPROVED ||
+    station.claimStatus === CLAIM_STATUS.PAID
+  ) {
+    return 'done';
+  }
+  if (
+    station.claimStatus === CLAIM_STATUS.PENDING_APPROVAL ||
+    (station.completionDate && !station.commissioningDate)
+  ) {
+    return 'callPutOn';
+  }
+  if (station.startDate || station.completionDate) return 'workInProgress';
+  return 'pending';
+}
+
+/** Largest-remainder allocation so bucket counts always sum to `total`. */
+function allocateByRatios(total, ratios) {
+  const keys = Object.keys(ratios);
+  const safeTotal = Math.max(0, Math.round(Number(total) || 0));
+  if (safeTotal === 0 || keys.length === 0) {
+    return Object.fromEntries(keys.map((k) => [k, 0]));
+  }
+
+  const weightSum = keys.reduce((sum, key) => sum + Math.max(0, Number(ratios[key]) || 0), 0);
+  if (weightSum <= 0) {
+    const empty = Object.fromEntries(keys.map((k) => [k, 0]));
+    empty[keys[keys.length - 1]] = safeTotal;
+    return empty;
+  }
+
+  const raw = keys.map((key) => {
+    const exact = (safeTotal * Math.max(0, Number(ratios[key]) || 0)) / weightSum;
+    return { key, floor: Math.floor(exact), frac: exact - Math.floor(exact) };
+  });
+  let remaining = safeTotal - raw.reduce((sum, row) => sum + row.floor, 0);
+  raw
+    .slice()
+    .sort((a, b) => b.frac - a.frac)
+    .forEach((row) => {
+      if (remaining <= 0) return;
+      row.floor += 1;
+      remaining -= 1;
+    });
+
+  return Object.fromEntries(raw.map((row) => [row.key, row.floor]));
+}
+
+function projectMaterialRatios(stations = []) {
+  if (!stations.length) {
+    return { done: 0, workInProgress: 0, callPutOn: 0, pending: 1 };
+  }
+  const counts = { done: 0, workInProgress: 0, callPutOn: 0, pending: 0 };
+  stations.forEach((station) => {
+    counts[stationMaterialBucket(station)] += 1;
+  });
+  return counts;
+}
+
+const MATERIAL_SLICE_META = [
+  { category: 'Panel', status: 'done', label: 'Panel done', color: '#1e3a8a' },
+  { category: 'Panel', status: 'workInProgress', label: 'Panel work in progress', color: '#93c5fd' },
+  { category: 'Panel', status: 'callPutOn', label: 'Panel call put on', color: '#7c3aed' },
+  { category: 'Panel', status: 'pending', label: 'Panel pending', color: '#c4b5fd' },
+  { category: 'ASD', status: 'done', label: 'ASD done', color: '#166534' },
+  { category: 'ASD', status: 'workInProgress', label: 'ASD work in progress', color: '#4ade80' },
+  { category: 'ASD', status: 'pending', label: 'ASD pending', color: '#bbf7d0' },
+  { category: 'LHS', status: 'done', label: 'LHS done', color: '#7f1d1d' },
+  { category: 'LHS', status: 'workInProgress', label: 'LHS work in progress', color: '#ef4444' },
+  { category: 'LHS', status: 'pending', label: 'LHS pending', color: '#f9a8d4' },
+];
+
+function buildProjectMaterialChart(project) {
+  const stations = project.stations || [];
+  const ratios = projectMaterialRatios(stations);
+  const panelTotal = Math.max(0, Number(project.totalUnits?.panel) || 0);
+  const asdTotal = Math.max(0, Number(project.totalUnits?.asd) || 0);
+  const lhsTotal = Math.max(0, Number(project.totalUnits?.lhs) || 0);
+  const stationTotal = stations.length;
+  const stationsCompleted = commissionedCount(stations);
+  const stationsNotCompleted = Math.max(0, stationTotal - stationsCompleted);
+
+  const panelAlloc = allocateByRatios(panelTotal, {
+    done: ratios.done,
+    workInProgress: ratios.workInProgress,
+    callPutOn: ratios.callPutOn,
+    pending: ratios.pending,
+  });
+  const asdAlloc = allocateByRatios(asdTotal, {
+    done: ratios.done,
+    workInProgress: ratios.workInProgress,
+    pending: ratios.pending + ratios.callPutOn,
+  });
+  const lhsAlloc = allocateByRatios(lhsTotal, {
+    done: ratios.done,
+    workInProgress: ratios.workInProgress,
+    pending: ratios.pending + ratios.callPutOn,
+  });
+
+  const totals = {
+    Panel: {
+      done: panelAlloc.done || 0,
+      workInProgress: panelAlloc.workInProgress || 0,
+      callPutOn: panelAlloc.callPutOn || 0,
+      pending: panelAlloc.pending || 0,
+    },
+    ASD: {
+      done: asdAlloc.done || 0,
+      workInProgress: asdAlloc.workInProgress || 0,
+      callPutOn: 0,
+      pending: asdAlloc.pending || 0,
+    },
+    LHS: {
+      done: lhsAlloc.done || 0,
+      workInProgress: lhsAlloc.workInProgress || 0,
+      callPutOn: 0,
+      pending: lhsAlloc.pending || 0,
+    },
+  };
+
+  const materialSlices = MATERIAL_SLICE_META.map((meta) => ({
+    name: meta.label,
+    category: meta.category,
+    status: meta.status,
+    value: totals[meta.category][meta.status] || 0,
+    color: meta.color,
+  })).filter((slice) => slice.value > 0);
+
+  const stationSlices = [
+    {
+      name: 'Stations completed',
+      category: 'Stations',
+      status: 'completed',
+      value: stationsCompleted,
+      color: '#0f766e',
+    },
+    {
+      name: 'Stations not completed',
+      category: 'Stations',
+      status: 'notCompleted',
+      value: stationsNotCompleted,
+      color: '#f59e0b',
+    },
+  ].filter((slice) => slice.value > 0);
+
+  const slices = [...materialSlices, ...stationSlices];
+  const chartTotal = slices.reduce((sum, slice) => sum + slice.value, 0);
+  const materialTotal = materialSlices.reduce((sum, slice) => sum + slice.value, 0);
+  const slicesWithPct = slices.map((slice) => ({
+    ...slice,
+    percent: chartTotal > 0 ? Math.round((slice.value / chartTotal) * 1000) / 10 : 0,
+  }));
+
+  const statusOrder = ['done', 'workInProgress', 'callPutOn', 'pending'];
+  const statusLabels = {
+    done: 'done',
+    workInProgress: 'work in progress',
+    callPutOn: 'call put on',
+    pending: 'pending',
+  };
+
+  const summaries = ['Panel', 'ASD', 'LHS'].map((category) => {
+    const bucket = totals[category];
+    const total = statusOrder.reduce((sum, key) => sum + (bucket[key] || 0), 0);
+    return {
+      category,
+      total,
+      parts: statusOrder
+        .filter((key) => (category === 'Panel' ? true : key !== 'callPutOn'))
+        .filter((key) => (bucket[key] || 0) > 0 || total === 0)
+        .map((key) => ({
+          status: statusLabels[key],
+          count: bucket[key] || 0,
+        })),
+    };
+  });
+
+  summaries.push({
+    category: 'Stations',
+    total: stationTotal,
+    parts: [
+      { status: 'completed', count: stationsCompleted },
+      { status: 'not completed', count: stationsNotCompleted },
+    ],
+  });
+
+  return {
+    panelTotal,
+    asdTotal,
+    lhsTotal,
+    stationTotal,
+    stationsCompleted,
+    stationsNotCompleted,
+    totalUnits: materialTotal,
+    chartTotal,
+    slices: slicesWithPct,
+    summaries,
+    totals,
+  };
+}
+
 async function getProjectsOverview(limit = 10, user) {
   const scope = projectScopeFilter(user);
   const projects = await Project.find(
     scope,
-    'projectName panelSerialNo loaNo railwayZone installationStartDate targetDate stations'
+    'projectName panelSerialNo loaNo railwayZone installationStartDate targetDate stations totalUnits'
   )
     .sort({ createdAt: -1 })
     .limit(Number(limit));
@@ -148,6 +352,7 @@ async function getProjectsOverview(limit = 10, user) {
     const total = stations.length;
     const completion = projectWorkDonePct(stations);
     const targetDate = p.targetDate || null;
+    const material = buildProjectMaterialChart(p);
 
     let statusLabel = 'In Progress';
     if (total > 0 && completion >= 100) statusLabel = 'Completed';
@@ -173,6 +378,7 @@ async function getProjectsOverview(limit = 10, user) {
       targetDate,
       daysToTarget,
       statusLabel,
+      material,
       stations: stations.map((s) => {
         const workDone = stationWorkDonePct(s);
         return {
@@ -267,4 +473,81 @@ async function getRecentActivity(limit = 10) {
   return activity.sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, take);
 }
 
-module.exports = { getStats, getProjectProgress, getProjectsOverview, getDailyFeed, getRecentReports, getRecentActivity };
+/**
+ * Aggregated AFDAS overview across all projects (Panel / ASD / LHS).
+ */
+async function getMaterialStatusOverview(user) {
+  const scope = projectScopeFilter(user);
+  const projects = await Project.find(scope, 'projectName totalUnits stations');
+
+  const totals = {
+    Panel: { done: 0, workInProgress: 0, callPutOn: 0, pending: 0 },
+    ASD: { done: 0, workInProgress: 0, callPutOn: 0, pending: 0 },
+    LHS: { done: 0, workInProgress: 0, callPutOn: 0, pending: 0 },
+  };
+
+  projects.forEach((project) => {
+    const material = buildProjectMaterialChart(project);
+    ['Panel', 'ASD', 'LHS'].forEach((category) => {
+      ['done', 'workInProgress', 'callPutOn', 'pending'].forEach((key) => {
+        totals[category][key] += material.totals[category][key] || 0;
+      });
+    });
+  });
+
+  const slices = MATERIAL_SLICE_META.map((meta) => ({
+    name: meta.label,
+    category: meta.category,
+    status: meta.status,
+    value: totals[meta.category][meta.status] || 0,
+    color: meta.color,
+  })).filter((slice) => slice.value > 0);
+
+  const totalUnits = slices.reduce((sum, slice) => sum + slice.value, 0);
+  const slicesWithPct = slices.map((slice) => ({
+    ...slice,
+    percent: totalUnits > 0 ? Math.round((slice.value / totalUnits) * 1000) / 10 : 0,
+  }));
+
+  const statusOrder = ['done', 'workInProgress', 'callPutOn', 'pending'];
+  const statusLabels = {
+    done: 'done',
+    workInProgress: 'work in progress',
+    callPutOn: 'call put on',
+    pending: 'pending',
+  };
+
+  const summaries = ['Panel', 'ASD', 'LHS'].map((category) => {
+    const bucket = totals[category];
+    const total = statusOrder.reduce((sum, key) => sum + (bucket[key] || 0), 0);
+    return {
+      category,
+      total,
+      parts: statusOrder
+        .filter((key) => (category === 'Panel' ? true : key !== 'callPutOn'))
+        .filter((key) => (bucket[key] || 0) > 0 || total === 0)
+        .map((key) => ({
+          status: statusLabels[key],
+          count: bucket[key] || 0,
+        })),
+    };
+  });
+
+  return {
+    title: 'AFDAS Work — Material Status Overview',
+    subtitle: `Control Panel, ASD & LHS (Total: ${totalUnits} units)`,
+    totalUnits,
+    slices: slicesWithPct,
+    summaries,
+  };
+}
+
+module.exports = {
+  getStats,
+  getProjectProgress,
+  getProjectsOverview,
+  getDailyFeed,
+  getRecentReports,
+  getRecentActivity,
+  getMaterialStatusOverview,
+};
