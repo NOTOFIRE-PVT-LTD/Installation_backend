@@ -960,6 +960,13 @@ async function removeStationDailyReport(projectId, stationId, reportId, user) {
   return fetchProjectById(projectId);
 }
 
+async function listInstallerOptions() {
+  return userRepository.find(
+    { status: USER_STATUS.ACTIVE, role: ROLES.USER },
+    { select: 'name email mobileNumber', sort: { name: 1 } }
+  );
+}
+
 module.exports = {
   list,
   getById,
@@ -968,6 +975,7 @@ module.exports = {
   remove,
   sanitizeProjectForUser,
   listAllForDropdown,
+  listInstallerOptions,
   getApprovalsQueue,
   addStation,
   updateStation,

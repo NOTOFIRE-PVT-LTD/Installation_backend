@@ -16,6 +16,11 @@ const options = asyncHandler(async (req, res) => {
   sendSuccess(res, { message: 'Projects fetched', data: projects });
 });
 
+const installerOptions = asyncHandler(async (_req, res) => {
+  const installers = await projectService.listInstallerOptions();
+  sendSuccess(res, { message: 'Installer options fetched', data: installers });
+});
+
 const approvalsQueue = asyncHandler(async (req, res) => {
   const queue = await projectService.getApprovalsQueue();
   sendSuccess(res, { message: 'Approvals queue fetched', data: queue });
@@ -121,6 +126,7 @@ const removeStationDailyReport = asyncHandler(async (req, res) => {
 module.exports = {
   list,
   options,
+  installerOptions,
   getById,
   create,
   update,

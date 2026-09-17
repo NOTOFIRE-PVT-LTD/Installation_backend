@@ -14,6 +14,7 @@ router.use(authenticate);
 
 router.get('/', requirePermissionOrRole('projects', ROLES.USER), validate(projectValidator.list), projectController.list);
 router.get('/options', requirePermissionOrRole('projects', ROLES.USER), projectController.options);
+router.get('/installer-options', requirePermissionOrRole('projects', ROLES.USER), projectController.installerOptions);
 router.get('/approvals/queue', requireRole(ROLES.ADMIN), requirePermission('claimApprovals'), projectController.approvalsQueue);
 router.get('/:id', requirePermissionOrRole('projects', ROLES.USER), validate(projectValidator.idParam), projectController.getById);
 
