@@ -1,6 +1,7 @@
 const projectRepository = require('../repositories/project.repository');
 const userRepository = require('../repositories/user.repository');
 const uploadService = require('./upload.service');
+const env = require('../config/env');
 const whatsappNotificationService = require('./whatsappNotification.service');
 const ApiError = require('../utils/ApiError');
 const { buildPagination, buildSort, buildPaginatedResult } = require('../utils/pagination');
@@ -444,6 +445,37 @@ function parseIdList(raw) {
   }
 }
 
+function parseDirectMedia(raw, { folder, allowResourceType = false, allowOriginalName = false } = {}) {
+  const parsed = parseJSONField(raw);
+  const items = Array.isArray(parsed) ? parsed : [];
+  const folderPrefix = `${String(folder || '').replace(/\/+$/, '')}/`;
+  const cloudName = String(env.cloudinary.cloudName || '').trim();
+
+  return items
+    .map((item) => {
+      const url = String(item?.url || '').trim();
+      const publicId = String(item?.publicId || item?.public_id || '').trim();
+      let parsedUrl;
+      try {
+        parsedUrl = new URL(url);
+      } catch {
+        return null;
+      }
+
+      const isExpectedCloudinaryUrl =
+        parsedUrl.protocol === 'https:' &&
+        parsedUrl.hostname === 'res.cloudinary.com' &&
+        (!cloudName || parsedUrl.pathname.startsWith(`/${cloudName}/`));
+      if (!url || !publicId || !publicId.startsWith(folderPrefix) || !isExpectedCloudinaryUrl) return null;
+
+      const media = { url, publicId };
+      if (allowResourceType) media.resourceType = item?.resourceType === 'raw' ? 'raw' : 'image';
+      if (allowOriginalName && item?.originalName) media.originalName = String(item.originalName).trim().slice(0, 255);
+      return media;
+    })
+    .filter(Boolean);
+}
+
 function materialsFromLoaItems(loaItems = []) {
   return (Array.isArray(loaItems) ? loaItems : [])
     .filter((row) => String(row?.item || '').trim())
@@ -467,6 +499,8 @@ async function addStation(projectId, data, files, actorId, user) {
 
   const completeFiles = files?.completePhotos || [];
   const remainingFiles = files?.remainingPhotos || [];
+  const directCompletePhotos = parseDirectMedia(data.directCompletePhotos, { folder: env.cloudinary.imageFolder });
+  const directRemainingPhotos = parseDirectMedia(data.directRemainingPhotos, { folder: env.cloudinary.imageFolder });
 
   const newStation = { name: data.name };
   applyStationFields(newStation, data);
@@ -474,8 +508,14 @@ async function addStation(projectId, data, files, actorId, user) {
   if (!Array.isArray(newStation.materials) || newStation.materials.length === 0) {
     newStation.materials = materialsFromLoaItems(project.loaItems);
   }
-  newStation.completePhotos = await Promise.all(completeFiles.map((f) => uploadService.uploadImageBuffer(f.buffer)));
-  newStation.remainingPhotos = await Promise.all(remainingFiles.map((f) => uploadService.uploadImageBuffer(f.buffer)));
+  newStation.completePhotos = [
+    ...(await Promise.all(completeFiles.map((f) => uploadService.uploadImageBuffer(f.buffer)))),
+    ...directCompletePhotos,
+  ];
+  newStation.remainingPhotos = [
+    ...(await Promise.all(remainingFiles.map((f) => uploadService.uploadImageBuffer(f.buffer)))),
+    ...directRemainingPhotos,
+  ];
 
   project.stations.push(newStation);
   project.updatedBy = actorId;
@@ -652,11 +692,19 @@ async function updateStation(
     const uploaded = await Promise.all(newCompleteFiles.map((f) => uploadService.uploadImageBuffer(f.buffer)));
     station.completePhotos = [...station.completePhotos, ...uploaded];
   }
+  const directCompletePhotos = parseDirectMedia(data.directCompletePhotos, { folder: env.cloudinary.imageFolder });
+  if (directCompletePhotos.length > 0) {
+    station.completePhotos = [...station.completePhotos, ...directCompletePhotos];
+  }
 
   const newRemainingFiles = files?.remainingPhotos || [];
   if (newRemainingFiles.length > 0) {
     const uploaded = await Promise.all(newRemainingFiles.map((f) => uploadService.uploadImageBuffer(f.buffer)));
     station.remainingPhotos = [...station.remainingPhotos, ...uploaded];
+  }
+  const directRemainingPhotos = parseDirectMedia(data.directRemainingPhotos, { folder: env.cloudinary.imageFolder });
+  if (directRemainingPhotos.length > 0) {
+    station.remainingPhotos = [...station.remainingPhotos, ...directRemainingPhotos];
   }
 
   const newWorkPhotos = files?.workPhotos || [];
@@ -664,37 +712,62 @@ async function updateStation(
     const uploaded = await Promise.all(newWorkPhotos.map((f) => uploadService.uploadImageBuffer(f.buffer)));
     station.workPhotos = [...station.workPhotos, ...uploaded];
   }
+  const directWorkPhotos = parseDirectMedia(data.directWorkPhotos, { folder: env.cloudinary.imageFolder });
+  if (directWorkPhotos.length > 0) {
+    station.workPhotos = [...station.workPhotos, ...directWorkPhotos];
+  }
 
   const checklistFile = files?.checklistFile?.[0];
-  if (checklistFile) {
+  const directChecklistFile = parseDirectMedia(data.directChecklistFile, { folder: env.cloudinary.documentFolder })[0];
+  if (checklistFile || directChecklistFile) {
     if (station.checklistFile?.publicId) await uploadService.deleteAsset(station.checklistFile.publicId, 'raw');
-    station.checklistFile = await uploadService.uploadDocumentBuffer(checklistFile.buffer);
+    station.checklistFile = checklistFile
+      ? await uploadService.uploadDocumentBuffer(checklistFile.buffer)
+      : directChecklistFile;
   }
 
   const checklistSignedFile = files?.checklistSignedFile?.[0];
-  if (checklistSignedFile) {
+  const directChecklistSignedFile = parseDirectMedia(data.directChecklistSignedFile, {
+    folder: env.cloudinary.documentFolder,
+  })[0];
+  if (checklistSignedFile || directChecklistSignedFile) {
     if (station.checklistSignedFile?.publicId) await uploadService.deleteAsset(station.checklistSignedFile.publicId, 'raw');
-    station.checklistSignedFile = await uploadService.uploadDocumentBuffer(checklistSignedFile.buffer);
+    station.checklistSignedFile = checklistSignedFile
+      ? await uploadService.uploadDocumentBuffer(checklistSignedFile.buffer)
+      : directChecklistSignedFile;
   }
 
   const cadDrawingFile = files?.cadDrawingFile?.[0];
-  if (cadDrawingFile) {
+  const directCadDrawingFile = parseDirectMedia(data.directCadDrawingFile, { folder: env.cloudinary.cadFolder })[0];
+  if (cadDrawingFile || directCadDrawingFile) {
     if (station.cadDrawingFile?.publicId) {
       const oldId = station.cadDrawingFile.publicId;
       await uploadService.deleteAsset(oldId, 'image');
       await uploadService.deleteAsset(oldId, 'raw');
     }
-    const resourceType = cadDrawingFile.mimetype === 'application/pdf' ? 'raw' : 'image';
-    station.cadDrawingFile =
-      resourceType === 'raw'
-        ? await uploadService.uploadDocumentBuffer(cadDrawingFile.buffer)
-        : await uploadService.uploadImageBuffer(cadDrawingFile.buffer);
+    if (cadDrawingFile) {
+      const resourceType = cadDrawingFile.mimetype === 'application/pdf' ? 'raw' : 'image';
+      station.cadDrawingFile =
+        resourceType === 'raw'
+          ? await uploadService.uploadDocumentBuffer(cadDrawingFile.buffer)
+          : await uploadService.uploadImageBuffer(cadDrawingFile.buffer);
+    } else {
+      station.cadDrawingFile = directCadDrawingFile;
+    }
   }
 
   const newCadFiles = files?.cadDrawingFiles || [];
   if (newCadFiles.length > 0) {
     const uploaded = await Promise.all(newCadFiles.map((f) => uploadService.uploadCadFile(f)));
     station.cadDrawingFiles = [...(station.cadDrawingFiles || []), ...uploaded];
+  }
+  const directCadFiles = parseDirectMedia(data.directCadDrawingFiles, {
+    folder: env.cloudinary.cadFolder,
+    allowResourceType: true,
+    allowOriginalName: true,
+  });
+  if (directCadFiles.length > 0) {
+    station.cadDrawingFiles = [...(station.cadDrawingFiles || []), ...directCadFiles];
   }
 
   project.updatedBy = actorId;

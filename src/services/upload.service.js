@@ -23,8 +23,18 @@ function uploadVideoBuffer(buffer) {
 }
 
 function getUploadSignature({ resourceType = 'image' } = {}) {
-  const type = resourceType === 'video' ? 'video' : 'image';
-  const folder = type === 'video' ? env.cloudinary.videoFolder : env.cloudinary.imageFolder;
+  // Keep the public client upload endpoint constrained to the folders the API
+  // itself uses. This lets browsers upload station media directly to Cloudinary
+  // without exposing an unrestricted upload preset.
+  const uploadTargets = {
+    image: { type: 'image', folder: env.cloudinary.imageFolder },
+    video: { type: 'video', folder: env.cloudinary.videoFolder },
+    document: { type: 'raw', folder: env.cloudinary.documentFolder },
+    cadImage: { type: 'image', folder: env.cloudinary.cadFolder },
+    cadDocument: { type: 'raw', folder: env.cloudinary.cadFolder },
+  };
+  const target = uploadTargets[resourceType] || uploadTargets.image;
+  const { type, folder } = target;
   const timestamp = Math.round(Date.now() / 1000);
   const paramsToSign = { timestamp, folder };
   const signature = cloudinary.utils.api_sign_request(paramsToSign, env.cloudinary.apiSecret);

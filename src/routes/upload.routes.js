@@ -13,8 +13,8 @@ router.post(
   validate([
     body('resourceType')
       .optional()
-      .isIn(['image', 'video'])
-      .withMessage('resourceType must be image or video'),
+      .isIn(['image', 'video', 'document', 'cadImage', 'cadDocument'])
+      .withMessage('Invalid upload resource type'),
   ]),
   uploadController.cloudinarySign
 );
