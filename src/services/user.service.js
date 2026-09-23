@@ -134,6 +134,20 @@ async function triggerPasswordReset(id) {
   await authService.forgotPassword(user.email);
 }
 
+async function setPassword(id, newPassword) {
+  const user = await userRepository.findById(id);
+  if (!user) throw new ApiError(404, 'User not found');
+
+  // Use the model's password setter so the pre-save hook hashes it
+  user.password = newPassword;
+  await user.save();
+
+  // Revoke all active sessions so they must re-login with the new password
+  await refreshTokenRepository.revokeAllForUser(user._id);
+
+  await emailService.sendPasswordChangedEmail(user);
+}
+
 async function updatePermissions(id, updates, actorId) {
   const user = await userRepository.findById(id);
   if (!user) throw new ApiError(404, 'User not found');
@@ -200,6 +214,7 @@ module.exports = {
   remove,
   updateStatus,
   triggerPasswordReset,
+  setPassword,
   updatePermissions,
   updateOwnProfile,
   impersonate,

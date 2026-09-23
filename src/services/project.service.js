@@ -487,9 +487,32 @@ function materialsFromLoaItems(loaItems = []) {
 }
 
 function syncStationMaterialsFromLoa(project) {
-  const materials = materialsFromLoaItems(project.loaItems);
+  const loaMaterials = materialsFromLoaItems(project.loaItems);
+  if (!loaMaterials.length) return;
+
   (project.stations || []).forEach((station) => {
-    station.materials = materials.map((row) => ({ ...row }));
+    const existing = Array.isArray(station.materials) ? station.materials : [];
+
+    if (existing.length === 0) {
+      // Station has never had materials set — seed from LOA
+      station.materials = loaMaterials.map((row) => ({ ...row }));
+    } else {
+      // Station already has saved (possibly customised) materials.
+      // Only append LOA items that are not yet present; NEVER touch existing quantities.
+      const existingNames = new Set(
+        existing.map((m) => String(m.item || '').trim().toLowerCase())
+      );
+      const newItems = loaMaterials
+        .filter((loa) => !existingNames.has(String(loa.item || '').trim().toLowerCase()))
+        .map((row) => ({ item: row.item, qty: 0, unit: row.unit }));
+
+      if (newItems.length > 0) {
+        station.materials = [...existing, ...newItems];
+      }
+      // If nothing new, leave station.materials completely untouched.
+    }
+
+    if (typeof station.markModified === 'function') station.markModified('materials');
   });
 }
 
@@ -656,7 +679,7 @@ async function updateStation(
   if (!station) throw new ApiError(404, 'Station not found');
 
   applyStationFields(station, data);
-
+  station.markModified('materials'); // ensure Mongoose detects subdocument array changes
   const removeIds = new Set(parseIdList(removePhotoIdsRaw));
   if (removeIds.size > 0) {
     const toRemove = [...station.completePhotos, ...station.remainingPhotos, ...station.workPhotos].filter((p) =>

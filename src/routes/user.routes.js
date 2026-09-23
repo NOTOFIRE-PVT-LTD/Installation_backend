@@ -20,6 +20,7 @@ router.put('/:id', uploadProfileImage, validate(userValidator.update), userContr
 router.delete('/:id', validate(userValidator.idParam), userController.remove);
 router.patch('/:id/status', validate(userValidator.updateStatus), userController.updateStatus);
 router.post('/:id/reset-password', validate(userValidator.idParam), userController.resetPassword);
+router.patch('/:id/set-password', validate(userValidator.setPassword), userController.setPassword);
 router.put('/:id/permissions', validate(userValidator.updatePermissions), userController.updatePermissions);
 router.post('/:id/impersonate', validate(userValidator.idParam), userController.impersonate);
 

@@ -38,4 +38,9 @@ const updateProfile = [
   body('mobileNumber').optional().trim().notEmpty().withMessage('Mobile number cannot be empty'),
 ];
 
-module.exports = { create, update, idParam, updateStatus, updatePermissions, list, updateProfile };
+const setPassword = [
+  param('id').isMongoId().withMessage('Invalid user id'),
+  body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
+];
+
+module.exports = { create, update, idParam, updateStatus, updatePermissions, list, updateProfile, setPassword };

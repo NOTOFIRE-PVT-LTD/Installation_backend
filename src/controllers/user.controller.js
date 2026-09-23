@@ -50,6 +50,11 @@ const resetPassword = asyncHandler(async (req, res) => {
   sendSuccess(res, { message: 'Password reset email has been sent to the user' });
 });
 
+const setPassword = asyncHandler(async (req, res) => {
+  await userService.setPassword(req.params.id, req.body.password);
+  sendSuccess(res, { message: 'Password updated successfully. All active sessions for this user have been revoked.' });
+});
+
 const updatePermissions = asyncHandler(async (req, res) => {
   const user = await userService.updatePermissions(req.params.id, req.body, req.user._id);
   sendSuccess(res, { message: 'Permissions updated', data: user });
@@ -60,4 +65,4 @@ const impersonate = asyncHandler(async (req, res) => {
   sendSuccess(res, { message: `Logged in as ${result.user.name}`, data: result });
 });
 
-module.exports = { list, options, getById, create, update, remove, updateStatus, resetPassword, updatePermissions, impersonate };
+module.exports = { list, options, getById, create, update, remove, updateStatus, resetPassword, setPassword, updatePermissions, impersonate };
