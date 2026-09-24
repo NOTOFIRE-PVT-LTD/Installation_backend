@@ -206,6 +206,35 @@ const MATERIAL_SLICE_META = [
   { category: 'LHS', status: 'pending', label: 'LHS pending', color: '#f9a8d4' },
 ];
 
+/** Station "Materials Used" item names that count as installed Panel / ASD / LHS units. */
+const MATERIAL_DONE_ITEMS = {
+  Panel: 'fire alarm control panel',
+  ASD: 'aspiration detection unit',
+  LHS: 'lhs interface module',
+};
+
+function normalizeMaterialName(name) {
+  return String(name || '')
+    .toLowerCase()
+    .replace(/\(.*?\)/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function stationMaterialDoneQty(stations = []) {
+  const done = { Panel: 0, ASD: 0, LHS: 0 };
+  stations.forEach((station) => {
+    (station.materials || []).forEach((material) => {
+      const itemName = normalizeMaterialName(material.item);
+      const qty = Math.max(0, Number(material.qty) || 0);
+      Object.entries(MATERIAL_DONE_ITEMS).forEach(([category, target]) => {
+        if (itemName === target) done[category] += qty;
+      });
+    });
+  });
+  return done;
+}
+
 function buildProjectMaterialChart(project) {
   const stations = project.stations || [];
   const ratios = projectMaterialRatios(stations);
@@ -216,22 +245,27 @@ function buildProjectMaterialChart(project) {
   const stationsCompleted = commissionedCount(stations);
   const stationsNotCompleted = Math.max(0, stationTotal - stationsCompleted);
 
-  const panelAlloc = allocateByRatios(panelTotal, {
-    done: ratios.done,
+  const materialDone = stationMaterialDoneQty(stations);
+  const panelDone = Math.min(panelTotal, Math.round(materialDone.Panel));
+  const asdDone = Math.min(asdTotal, Math.round(materialDone.ASD));
+  const lhsDone = Math.min(lhsTotal, Math.round(materialDone.LHS));
+
+  const panelAlloc = allocateByRatios(panelTotal - panelDone, {
     workInProgress: ratios.workInProgress,
     callPutOn: ratios.callPutOn,
     pending: ratios.pending,
   });
-  const asdAlloc = allocateByRatios(asdTotal, {
-    done: ratios.done,
+  const asdAlloc = allocateByRatios(asdTotal - asdDone, {
     workInProgress: ratios.workInProgress,
     pending: ratios.pending + ratios.callPutOn,
   });
-  const lhsAlloc = allocateByRatios(lhsTotal, {
-    done: ratios.done,
+  const lhsAlloc = allocateByRatios(lhsTotal - lhsDone, {
     workInProgress: ratios.workInProgress,
     pending: ratios.pending + ratios.callPutOn,
   });
+  panelAlloc.done = panelDone;
+  asdAlloc.done = asdDone;
+  lhsAlloc.done = lhsDone;
 
   const totals = {
     Panel: {
