@@ -19,6 +19,11 @@ router.post('/components/import', uploadSpreadsheet, bomController.importCompone
 router.get('/productions', validate(bomValidator.productionList), bomController.listProductions);
 router.get('/productions/:id', validate(bomValidator.productionIdParam), bomController.getProductionById);
 router.delete('/productions/:id', validate(bomValidator.productionIdParam), bomController.removeProduction);
+router.post(
+  '/productions/:id/issue-pending',
+  validate(bomValidator.productionIdParam),
+  bomController.issuePendingProduction
+);
 router.post('/productions/preview', validate(bomValidator.productionPreview), bomController.previewProduction);
 router.post('/productions/confirm', validate(bomValidator.productionConfirm), bomController.confirmProduction);
 router.get('/:id', validate(bomValidator.bomIdParam), bomController.getBomById);

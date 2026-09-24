@@ -221,26 +221,49 @@ function normalizeMaterialName(name) {
     .trim();
 }
 
-function stationMaterialDoneQty(stations = []) {
-  const done = { Panel: 0, ASD: 0, LHS: 0 };
-  stations.forEach((station) => {
-    (station.materials || []).forEach((material) => {
-      const itemName = normalizeMaterialName(material.item);
-      const qty = Math.max(0, Number(material.qty) || 0);
-      Object.entries(MATERIAL_DONE_ITEMS).forEach(([category, target]) => {
-        if (itemName === target) done[category] += qty;
-      });
+function sumMaterialQty(rows = []) {
+  const sums = { Panel: 0, ASD: 0, LHS: 0 };
+  const found = { Panel: false, ASD: false, LHS: false };
+  rows.forEach((row) => {
+    const itemName = normalizeMaterialName(row.item);
+    const qty = Math.max(0, Number(row.qty) || 0);
+    Object.entries(MATERIAL_DONE_ITEMS).forEach(([category, target]) => {
+      if (itemName === target) {
+        sums[category] += qty;
+        found[category] = true;
+      }
     });
   });
-  return done;
+  return { sums, found };
+}
+
+function stationMaterialDoneQty(stations = []) {
+  return sumMaterialQty(stations.flatMap((station) => station.materials || [])).sums;
+}
+
+/** Project totals come from "Items as per LOA"; Site Scope totals are used only when the LOA item is missing. */
+function projectLoaTotals(project) {
+  const { sums, found } = sumMaterialQty(project.loaItems || []);
+  const fallback = {
+    Panel: Number(project.totalUnits?.panel) || 0,
+    ASD: Number(project.totalUnits?.asd) || 0,
+    LHS: Number(project.totalUnits?.lhs) || 0,
+  };
+  return Object.fromEntries(
+    Object.keys(sums).map((category) => [
+      category,
+      Math.max(0, Math.round(found[category] ? sums[category] : fallback[category])),
+    ])
+  );
 }
 
 function buildProjectMaterialChart(project) {
   const stations = project.stations || [];
   const ratios = projectMaterialRatios(stations);
-  const panelTotal = Math.max(0, Number(project.totalUnits?.panel) || 0);
-  const asdTotal = Math.max(0, Number(project.totalUnits?.asd) || 0);
-  const lhsTotal = Math.max(0, Number(project.totalUnits?.lhs) || 0);
+  const loaTotals = projectLoaTotals(project);
+  const panelTotal = loaTotals.Panel;
+  const asdTotal = loaTotals.ASD;
+  const lhsTotal = loaTotals.LHS;
   const stationTotal = stations.length;
   const stationsCompleted = commissionedCount(stations);
   const stationsNotCompleted = Math.max(0, stationTotal - stationsCompleted);
@@ -373,7 +396,7 @@ async function getProjectsOverview(limit = 10, user) {
   const scope = projectScopeFilter(user);
   const projects = await Project.find(
     scope,
-    'projectName panelSerialNo loaNo railwayZone installationStartDate targetDate stations totalUnits'
+    'projectName panelSerialNo loaNo railwayZone installationStartDate targetDate stations totalUnits loaItems'
   )
     .sort({ createdAt: -1 })
     .limit(Number(limit));
@@ -512,7 +535,7 @@ async function getRecentActivity(limit = 10) {
  */
 async function getMaterialStatusOverview(user) {
   const scope = projectScopeFilter(user);
-  const projects = await Project.find(scope, 'projectName totalUnits stations');
+  const projects = await Project.find(scope, 'projectName totalUnits stations loaItems');
 
   const totals = {
     Panel: { done: 0, workInProgress: 0, callPutOn: 0, pending: 0 },

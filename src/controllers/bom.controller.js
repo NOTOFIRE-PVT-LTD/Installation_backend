@@ -55,6 +55,11 @@ const confirmProduction = asyncHandler(async (req, res) => {
   sendSuccess(res, { statusCode: 201, message: 'BOM production confirmed', data: production });
 });
 
+const issuePendingProduction = asyncHandler(async (req, res) => {
+  const production = await bomService.issuePendingProduction(req.params.id, req.user._id);
+  sendSuccess(res, { message: 'Pending BOM quantity issued', data: production });
+});
+
 const listProductions = asyncHandler(async (req, res) => {
   const result = await bomService.listProductions(req.query);
   sendSuccess(res, { message: 'BOM productions fetched', data: result.items, meta: result });
@@ -80,6 +85,7 @@ module.exports = {
   importComponents,
   previewProduction,
   confirmProduction,
+  issuePendingProduction,
   listProductions,
   getProductionById,
   removeProduction,

@@ -56,6 +56,7 @@ const productionList = [
   query('search').optional().trim(),
   query('bom').optional().isMongoId(),
   query('person').optional().trim(),
+  query('status').optional({ checkFalsy: true }).isIn(['pending', 'completed']),
 ];
 
 const productionIdParam = [param('id').isMongoId().withMessage('Invalid production id')];

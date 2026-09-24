@@ -9,10 +9,14 @@ const productionLineSchema = new Schema(
     qtyPerPcs: { type: Number, required: true, min: 0 },
     requiredQty: { type: Number, required: true, min: 0 },
     availableQty: { type: Number, default: 0 },
+    issuedQty: { type: Number, min: 0 },
+    pendingQty: { type: Number, default: 0, min: 0 },
     unit: { type: String, default: 'Nos' },
   },
   { _id: false }
 );
+
+const PRODUCTION_STATUSES = ['completed', 'pending'];
 
 const bomProductionSchema = new Schema(
   {
@@ -24,6 +28,7 @@ const bomProductionSchema = new Schema(
     productionDate: { type: Date, required: true, default: Date.now },
     referenceNo: { type: String, default: '', trim: true },
     remarks: { type: String, default: '', trim: true },
+    status: { type: String, enum: PRODUCTION_STATUSES, default: 'completed', index: true },
     lines: { type: [productionLineSchema], default: [] },
     movements: [{ type: Schema.Types.ObjectId, ref: 'StockMovement' }],
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },

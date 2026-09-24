@@ -190,6 +190,8 @@ async function previewProduction(data) {
       requiredQty,
       availableQty,
       shortage,
+      issueNowQty: requiredQty - shortage,
+      pendingQty: shortage,
       unit: item.unit || 'Nos',
     });
   }
@@ -202,25 +204,12 @@ async function previewProduction(data) {
     },
     productionQty,
     hasShortage,
-    canConfirm: !hasShortage,
+    canConfirm: true,
     lines,
   };
 }
 
-async function confirmProduction(data, actorId) {
-  const person = String(data.person || '').trim();
-  if (!person) throw new ApiError(400, 'Person name is required');
-
-  const preview = await previewProduction(data);
-  if (!preview.canConfirm) {
-    throw new ApiError(400, 'Insufficient warehouse stock for one or more BOM components');
-  }
-
-  const bom = await getBomById(data.bom);
-  const productionDate = data.productionDate || new Date();
-  const referenceNo = String(data.referenceNo || '').trim();
-  const remarks = String(data.remarks || '').trim();
-
+async function runInOptionalTransaction(work) {
   const session = await mongoose.startSession();
   let useTransaction = true;
   try {
@@ -230,72 +219,9 @@ async function confirmProduction(data, actorId) {
   }
 
   try {
-    const utilizeLines = preview.lines.map((line) => ({
-      stockItem: line.stockItem,
-      quantity: line.requiredQty,
-      issuedTo: person,
-      movementDate: productionDate,
-      referenceNo,
-      remarks: remarks || `BOM production: ${bom.name} v${bom.version} × ${preview.productionQty}`,
-    }));
-
-    const movements = await stockService.createUtilizeBatch(utilizeLines, actorId, {
-      session: useTransaction ? session : undefined,
-    });
-
-    let production;
-    if (useTransaction) {
-      const created = await BomProduction.create(
-        [
-          {
-            bom: bom._id,
-            bomName: bom.name,
-            bomVersion: bom.version,
-            productionQty: preview.productionQty,
-            person,
-            productionDate,
-            referenceNo,
-            remarks,
-            lines: preview.lines.map((line) => ({
-              stockItem: line.stockItem,
-              itemName: line.itemName,
-              qtyPerPcs: line.qtyPerPcs,
-              requiredQty: line.requiredQty,
-              availableQty: line.availableQty,
-              unit: line.unit,
-            })),
-            movements: movements.map((m) => m._id),
-            createdBy: actorId,
-          },
-        ],
-        { session }
-      );
-      production = created[0];
-      await session.commitTransaction();
-    } else {
-      production = await bomProductionRepository.create({
-        bom: bom._id,
-        bomName: bom.name,
-        bomVersion: bom.version,
-        productionQty: preview.productionQty,
-        person,
-        productionDate,
-        referenceNo,
-        remarks,
-        lines: preview.lines.map((line) => ({
-          stockItem: line.stockItem,
-          itemName: line.itemName,
-          qtyPerPcs: line.qtyPerPcs,
-          requiredQty: line.requiredQty,
-          availableQty: line.availableQty,
-          unit: line.unit,
-        })),
-        movements: movements.map((m) => m._id),
-        createdBy: actorId,
-      });
-    }
-
-    return bomProductionRepository.findById(production._id, { populate: PRODUCTION_POPULATE });
+    const result = await work(useTransaction ? session : undefined);
+    if (useTransaction) await session.commitTransaction();
+    return result;
   } catch (err) {
     if (useTransaction) {
       try {
@@ -310,12 +236,125 @@ async function confirmProduction(data, actorId) {
   }
 }
 
+async function confirmProduction(data, actorId) {
+  const person = String(data.person || '').trim();
+  if (!person) throw new ApiError(400, 'Person name is required');
+
+  const preview = await previewProduction(data);
+
+  const bom = await getBomById(data.bom);
+  const productionDate = data.productionDate || new Date();
+  const referenceNo = String(data.referenceNo || '').trim();
+  const remarks = String(data.remarks || '').trim();
+
+  const production = await runInOptionalTransaction(async (session) => {
+    const utilizeLines = preview.lines
+      .filter((line) => line.issueNowQty > 0)
+      .map((line) => ({
+        stockItem: line.stockItem,
+        quantity: line.issueNowQty,
+        issuedTo: person,
+        movementDate: productionDate,
+        referenceNo,
+        remarks: remarks || `BOM production: ${bom.name} v${bom.version} × ${preview.productionQty}`,
+      }));
+
+    const movements = utilizeLines.length
+      ? await stockService.createUtilizeBatch(utilizeLines, actorId, { session })
+      : [];
+
+    const [created] = await BomProduction.create(
+      [
+        {
+          bom: bom._id,
+          bomName: bom.name,
+          bomVersion: bom.version,
+          productionQty: preview.productionQty,
+          person,
+          productionDate,
+          referenceNo,
+          remarks,
+          status: preview.hasShortage ? 'pending' : 'completed',
+          lines: preview.lines.map((line) => ({
+            stockItem: line.stockItem,
+            itemName: line.itemName,
+            qtyPerPcs: line.qtyPerPcs,
+            requiredQty: line.requiredQty,
+            availableQty: line.availableQty,
+            issuedQty: line.issueNowQty,
+            pendingQty: line.pendingQty,
+            unit: line.unit,
+          })),
+          movements: movements.map((m) => m._id),
+          createdBy: actorId,
+        },
+      ],
+      session ? { session } : undefined
+    );
+    return created;
+  });
+
+  return bomProductionRepository.findById(production._id, { populate: PRODUCTION_POPULATE });
+}
+
+/** Issues pending BOM lines from warehouse stock received after the production was confirmed. */
+async function issuePendingProduction(id, actorId) {
+  const production = await BomProduction.findById(id);
+  if (!production) throw new ApiError(404, 'BOM production not found');
+  if (production.status !== 'pending') {
+    throw new ApiError(400, 'This production has no pending quantity');
+  }
+
+  const movementDate = new Date();
+  const plan = [];
+  for (const line of production.lines) {
+    const pending = qty(line.pendingQty);
+    if (pending <= 0) continue;
+    const balances = await stockService.getBalances(line.stockItem);
+    const issueQty = Math.min(pending, qty(balances.warehouseQty));
+    if (issueQty > 0) plan.push({ line, issueQty });
+  }
+
+  if (plan.length === 0) {
+    throw new ApiError(400, 'No warehouse stock received yet for the pending items');
+  }
+
+  await runInOptionalTransaction(async (session) => {
+    const movements = await stockService.createUtilizeBatch(
+      plan.map(({ line, issueQty }) => ({
+        stockItem: line.stockItem,
+        quantity: issueQty,
+        issuedTo: production.person,
+        movementDate,
+        referenceNo: production.referenceNo,
+        remarks: `BOM production pending issue: ${production.bomName} v${production.bomVersion} × ${production.productionQty}`,
+      })),
+      actorId,
+      { session }
+    );
+
+    plan.forEach(({ line, issueQty }) => {
+      const alreadyIssued = line.issuedQty ?? qty(line.requiredQty) - qty(line.pendingQty);
+      line.issuedQty = alreadyIssued + issueQty;
+      line.pendingQty = Math.max(0, qty(line.pendingQty) - issueQty);
+    });
+    production.movements.push(...movements.map((m) => m._id));
+    production.status = production.lines.some((line) => qty(line.pendingQty) > 0) ? 'pending' : 'completed';
+    production.markModified('lines');
+    await production.save(session ? { session } : undefined);
+  });
+
+  return bomProductionRepository.findById(production._id, { populate: PRODUCTION_POPULATE });
+}
+
 async function listProductions(query) {
   const { page, pageSize, skip } = buildPagination(query);
   const sort = buildSort(query, PRODUCTION_SORT);
   const filter = {};
   if (query.bom) filter.bom = query.bom;
   if (query.person) filter.person = new RegExp(String(query.person).trim(), 'i');
+  if (query.status === 'pending') filter.status = 'pending';
+  if (query.status === 'completed') filter.status = { $ne: 'pending' };
   if (query.search) {
     const regex = new RegExp(String(query.search).trim(), 'i');
     filter.$or = [{ bomName: regex }, { person: regex }, { referenceNo: regex }, { remarks: regex }];
@@ -573,6 +612,7 @@ module.exports = {
   removeBom,
   previewProduction,
   confirmProduction,
+  issuePendingProduction,
   listProductions,
   getProductionById,
   removeProduction,
