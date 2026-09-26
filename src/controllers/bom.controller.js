@@ -60,6 +60,11 @@ const issuePendingProduction = asyncHandler(async (req, res) => {
   sendSuccess(res, { message: 'Pending BOM quantity issued', data: production });
 });
 
+const updateProductionUnits = asyncHandler(async (req, res) => {
+  const production = await bomService.updateProductionUnits(req.params.id, req.body.lines);
+  sendSuccess(res, { message: 'Production units updated', data: production });
+});
+
 const listProductions = asyncHandler(async (req, res) => {
   const result = await bomService.listProductions(req.query);
   sendSuccess(res, { message: 'BOM productions fetched', data: result.items, meta: result });
@@ -86,6 +91,7 @@ module.exports = {
   previewProduction,
   confirmProduction,
   issuePendingProduction,
+  updateProductionUnits,
   listProductions,
   getProductionById,
   removeProduction,

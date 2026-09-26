@@ -19,6 +19,11 @@ router.post('/components/import', uploadSpreadsheet, bomController.importCompone
 router.get('/productions', validate(bomValidator.productionList), bomController.listProductions);
 router.get('/productions/:id', validate(bomValidator.productionIdParam), bomController.getProductionById);
 router.delete('/productions/:id', validate(bomValidator.productionIdParam), bomController.removeProduction);
+router.patch(
+  '/productions/:id/units',
+  validate(bomValidator.productionUnits),
+  bomController.updateProductionUnits
+);
 router.post(
   '/productions/:id/issue-pending',
   validate(bomValidator.productionIdParam),

@@ -48,6 +48,14 @@ const productionConfirm = [
   body('productionDate').optional({ checkFalsy: true }).isISO8601(),
   body('referenceNo').optional().trim(),
   body('remarks').optional().trim(),
+  body('lineUnits').optional().isObject().withMessage('lineUnits must be an object'),
+];
+
+const productionUnits = [
+  param('id').isMongoId().withMessage('Invalid production id'),
+  body('lines').isArray({ min: 1 }).withMessage('At least one line unit is required'),
+  body('lines.*.index').isInt({ min: 0 }).withMessage('Invalid line index'),
+  body('lines.*.unit').trim().notEmpty().withMessage('Unit is required'),
 ];
 
 const productionList = [
@@ -70,4 +78,5 @@ module.exports = {
   productionConfirm,
   productionList,
   productionIdParam,
+  productionUnits,
 };

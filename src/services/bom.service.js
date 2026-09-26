@@ -246,6 +246,11 @@ async function confirmProduction(data, actorId) {
   const productionDate = data.productionDate || new Date();
   const referenceNo = String(data.referenceNo || '').trim();
   const remarks = String(data.remarks || '').trim();
+  const lineUnits = data.lineUnits && typeof data.lineUnits === 'object' ? data.lineUnits : {};
+  preview.lines.forEach((line) => {
+    const override = String(lineUnits[String(line.stockItem)] || '').trim();
+    if (override) line.unit = override;
+  });
 
   const production = await runInOptionalTransaction(async (session) => {
     const utilizeLines = preview.lines
@@ -293,6 +298,23 @@ async function confirmProduction(data, actorId) {
     );
     return created;
   });
+
+  return bomProductionRepository.findById(production._id, { populate: PRODUCTION_POPULATE });
+}
+
+async function updateProductionUnits(id, lines = []) {
+  const production = await BomProduction.findById(id);
+  if (!production) throw new ApiError(404, 'BOM production not found');
+
+  lines.forEach(({ index, unit }) => {
+    const line = production.lines[Number(index)];
+    if (!line) throw new ApiError(400, `Production line ${index} not found`);
+    const nextUnit = String(unit || '').trim();
+    if (!nextUnit) throw new ApiError(400, 'Unit is required');
+    line.unit = nextUnit;
+  });
+  production.markModified('lines');
+  await production.save();
 
   return bomProductionRepository.findById(production._id, { populate: PRODUCTION_POPULATE });
 }
@@ -613,6 +635,7 @@ module.exports = {
   previewProduction,
   confirmProduction,
   issuePendingProduction,
+  updateProductionUnits,
   listProductions,
   getProductionById,
   removeProduction,

@@ -291,21 +291,43 @@ async function getBalances(stockItemId, { excludeMovementId } = {}) {
   return { inbound, issued, utilized, returned, warehouseQty, personQtys };
 }
 
+const ITEM_SEARCH_FIELDS = [
+  'name',
+  'sku',
+  'categoryName',
+  'componentName',
+  'subComponentName',
+  'itemType',
+  'unit',
+  'salesOrder',
+  'description',
+];
+
+function escapeRegex(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Splits a search string into words; every word must match at least one field. */
+function searchTerms(search) {
+  return String(search || '')
+    .trim()
+    .split(/[\s/,]+/)
+    .map((term) => term.trim())
+    .filter((term) => term && term !== '-');
+}
+
+function itemTermCondition(term) {
+  const regex = new RegExp(escapeRegex(term), 'i');
+  return { $or: ITEM_SEARCH_FIELDS.map((field) => ({ [field]: regex })) };
+}
+
 async function listItems(query) {
   const { page, pageSize, skip } = buildPagination(query);
   const sort = buildSort(query, ITEM_SORT);
   const filter = {};
-  if (query.search) {
-    const regex = new RegExp(String(query.search).trim(), 'i');
-    filter.$or = [
-      { name: regex },
-      { sku: regex },
-      { categoryName: regex },
-      { componentName: regex },
-      { subComponentName: regex },
-      { salesOrder: regex },
-      { description: regex },
-    ];
+  const terms = searchTerms(query.search);
+  if (terms.length) {
+    filter.$and = terms.map(itemTermCondition);
   }
 
   const { items, total } = await stockItemRepository.paginate({
@@ -440,10 +462,27 @@ async function listMovements(query) {
   const filter = {};
   if (query.type) filter.type = query.type;
   if (query.stockItem) filter.stockItem = query.stockItem;
-  if (query.issuedTo) filter.issuedTo = new RegExp(String(query.issuedTo).trim(), 'i');
-  if (query.search) {
-    const regex = new RegExp(String(query.search).trim(), 'i');
-    filter.$or = [{ supplierName: regex }, { issuedTo: regex }, { referenceNo: regex }, { remarks: regex }];
+  if (query.issuedTo) filter.issuedTo = new RegExp(escapeRegex(String(query.issuedTo).trim()), 'i');
+  const terms = searchTerms(query.search);
+  if (terms.length) {
+    filter.$and = await Promise.all(
+      terms.map(async (term) => {
+        const regex = new RegExp(escapeRegex(term), 'i');
+        const matchingItems = await stockItemRepository.find(itemTermCondition(term), { select: '_id' });
+        const conditions = [
+          { supplierName: regex },
+          { issuedTo: regex },
+          { referenceNo: regex },
+          { remarks: regex },
+          { stockItem: { $in: matchingItems.map((item) => item._id) } },
+        ];
+        const numeric = Number(term);
+        if (term !== '' && Number.isFinite(numeric)) {
+          conditions.push({ quantity: numeric }, { amount: numeric });
+        }
+        return { $or: conditions };
+      })
+    );
   }
 
   const { items, total } = await stockMovementRepository.paginate({
