@@ -172,6 +172,13 @@ async function previewProduction(data) {
 
   const lines = [];
   let hasShortage = false;
+  const missingCount = bom.components.filter((component) => !component.stockItem).length;
+  if (missingCount > 0) {
+    throw new ApiError(
+      400,
+      `${missingCount} component(s) in "${bom.name}" point to a stock item that was deleted. Edit the BOM and re-select the item.`
+    );
+  }
   for (const component of bom.components) {
     const item = component.stockItem?._id ? component.stockItem : await stockItemRepository.findById(component.stockItem);
     if (!item) throw new ApiError(404, 'BOM component item not found');

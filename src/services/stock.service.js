@@ -5,6 +5,7 @@ const stockItemRepository = require('../repositories/stockItem.repository');
 const stockMovementRepository = require('../repositories/stockMovement.repository');
 const stockCatalogRepository = require('../repositories/stockCatalog.repository');
 const StockMovement = require('../models/StockMovement.model');
+const Bom = require('../models/Bom.model');
 const uploadService = require('./upload.service');
 const ApiError = require('../utils/ApiError');
 const { buildPagination, buildSort, buildPaginatedResult } = require('../utils/pagination');
@@ -15,6 +16,7 @@ const {
   DEFAULT_STOCK_COMPONENT_NAMES,
 } = require('../config/constants');
 
+const STOCK_MAX_PAGE_SIZE = 1000;
 const ITEM_SORT = ['name', 'sku', 'unit', 'categoryName', 'quantity', 'amount', 'createdAt'];
 const MOVEMENT_SORT = ['movementDate', 'quantity', 'type', 'createdAt'];
 
@@ -322,7 +324,7 @@ function itemTermCondition(term) {
 }
 
 async function listItems(query) {
-  const { page, pageSize, skip } = buildPagination(query);
+  const { page, pageSize, skip } = buildPagination(query, { maxPageSize: STOCK_MAX_PAGE_SIZE });
   const sort = buildSort(query, ITEM_SORT);
   const filter = {};
   const terms = searchTerms(query.search);
@@ -398,17 +400,13 @@ async function updateItem(id, data, files, actorId) {
   );
 
   await stockItemRepository.updateById(id, {
-    category: category?._id || existing.category || null,
+    category: category?._id || null,
     component: component._id,
     subComponent: subComponent?._id || null,
-    categoryName: category?.name || existing.categoryName || '',
+    categoryName: category?.name || '',
     componentName: component.name,
     subComponentName: subComponent?.name || '',
-    name: buildItemName({
-      category: category || { name: existing.categoryName },
-      component,
-      subComponent,
-    }),
+    name: buildItemName({ category, component, subComponent }),
     sku: data.sku !== undefined ? String(data.sku || '').trim() : existing.sku,
     unit: String(data.unit || existing.unit || 'Nos').trim() || 'Nos',
     quantity: data.quantity !== undefined ? Math.max(0, Number(data.quantity) || 0) : existing.quantity,
@@ -432,6 +430,15 @@ async function removeItem(id) {
   const movementCount = await stockMovementRepository.countDocuments({ stockItem: id });
   if (movementCount > 0) {
     throw new ApiError(400, 'Cannot delete item that already has stock movements');
+  }
+  const bomsUsingItem = await Bom.find({ $or: [{ 'components.stockItem': id }, { finishedItem: id }] })
+    .select('name')
+    .lean();
+  if (bomsUsingItem.length > 0) {
+    throw new ApiError(
+      400,
+      `Cannot delete item used in BOM: ${bomsUsingItem.map((bom) => bom.name).join(', ')}. Remove it from the BOM first.`
+    );
   }
   await Promise.all(
     (existing.docs || []).map((doc) => uploadService.deleteAsset(doc.publicId, doc.resourceType || 'raw'))
@@ -457,7 +464,7 @@ async function removeItems(ids) {
 }
 
 async function listMovements(query) {
-  const { page, pageSize, skip } = buildPagination(query);
+  const { page, pageSize, skip } = buildPagination(query, { maxPageSize: STOCK_MAX_PAGE_SIZE });
   const sort = buildSort(query, MOVEMENT_SORT);
   const filter = {};
   if (query.type) filter.type = query.type;

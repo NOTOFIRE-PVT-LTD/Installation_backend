@@ -56,7 +56,7 @@ const bulkIds = [
 
 const itemList = [
   query('page').optional().isInt({ min: 1 }),
-  query('pageSize').optional().isInt({ min: 1, max: 100 }),
+  query('pageSize').optional().isInt({ min: 1, max: 1000 }),
   query('search').optional().trim(),
 ];
 
@@ -88,7 +88,7 @@ const movementIdParam = [param('id').isMongoId().withMessage('Invalid movement i
 
 const movementList = [
   query('page').optional().isInt({ min: 1 }),
-  query('pageSize').optional().isInt({ min: 1, max: 100 }),
+  query('pageSize').optional().isInt({ min: 1, max: 1000 }),
   query('search').optional().trim(),
   query('type').optional().isIn(Object.values(STOCK_MOVEMENT_TYPES)),
   query('stockItem').optional().isMongoId(),
