@@ -20,6 +20,7 @@ const MIXED_FIELDS = [
   'itemImage',
   'billPhoto',
   'visitingCard',
+  'productDatasheet',
 ];
 const MIXED_MIME_TYPES = [...IMAGE_MIME_TYPES, ...DOCUMENT_MIME_TYPES];
 
@@ -117,7 +118,13 @@ const uploadMasterItemFiles = upload.fields([
   { name: 'visitingCard', maxCount: 10 },
 ]);
 
+const uploadQuotationProductFiles = upload.fields([
+  { name: 'productDatasheet', maxCount: 1 },
+  { name: 'productPicture', maxCount: 1 },
+]);
+
 module.exports = {
+  uploadQuotationProductFiles,
   uploadReportFiles,
   uploadProfileImage,
   uploadProjectFiles,
