@@ -96,7 +96,7 @@ async function logout(rawRefreshToken) {
   const existing = await refreshTokenRepository.findValidByHash(tokenHash);
   if (existing && !existing.revoked) {
     existing.revoked = true;
-    await existing.save();
+    await existing.save();  
   }
 }
 
