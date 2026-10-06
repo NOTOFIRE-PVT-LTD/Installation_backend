@@ -7,6 +7,7 @@ const QUOTATION_MASTER_KINDS = Object.freeze(['company', 'party', 'terms']);
 /** Companies (quoting entity), parties (customers) and terms & conditions templates used by quotations. */
 const quotationMasterSchema = new Schema(
   {
+    legacySupabaseId: { type: String, default: null, index: true},
     kind: { type: String, enum: QUOTATION_MASTER_KINDS, required: true, index: true },
     name: { type: String, required: true, trim: true },
     gstin: { type: String, default: '', trim: true },

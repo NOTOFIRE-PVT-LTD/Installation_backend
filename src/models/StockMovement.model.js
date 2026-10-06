@@ -13,6 +13,7 @@ const stockMovementSchema = new Schema(
     },
     stockItem: { type: Schema.Types.ObjectId, ref: 'StockItem', required: true, index: true },
     quantity: { type: Number, required: true, min: 0.0001 },
+    unit: { type: String, default: '', trim: true },
     amount: { type: Number, default: 0, min: 0 },
     movementDate: { type: Date, required: true, default: Date.now },
     supplierName: { type: String, default: '', trim: true },

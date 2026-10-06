@@ -481,6 +481,7 @@ async function listMovements(query) {
           { issuedTo: regex },
           { referenceNo: regex },
           { remarks: regex },
+          { unit: regex },
           { stockItem: { $in: matchingItems.map((item) => item._id) } },
         ];
         const numeric = Number(term);
@@ -564,6 +565,7 @@ async function createMovement(data, actorId) {
     type,
     stockItem: item._id,
     quantity,
+    unit: String(data.unit || '').trim() || item.unit || 'Nos',
     amount: type === SUPPLIER_IN ? movementAmount : 0,
     movementDate: data.movementDate || new Date(),
     supplierName: type === SUPPLIER_IN ? String(data.supplierName || '').trim() : '',
@@ -638,6 +640,10 @@ async function updateMovement(id, data, actorId) {
   await stockMovementRepository.updateById(id, {
     stockItem: item._id,
     quantity,
+    unit:
+      (data.unit !== undefined ? String(data.unit || '').trim() : String(existing.unit || '').trim()) ||
+      item.unit ||
+      'Nos',
     amount: type === SUPPLIER_IN ? movementAmount : 0,
     movementDate: data.movementDate || existing.movementDate,
     supplierName: type === SUPPLIER_IN ? supplierName : '',
@@ -1075,6 +1081,7 @@ async function buildReceiveImportTemplate() {
     { header: 'Supplier Name', key: 'supplierName', width: 22 },
     { header: 'Amount', key: 'amount', width: 12 },
     { header: 'Quantity', key: 'quantity', width: 12 },
+    { header: 'UOM', key: 'unit', width: 10 },
     { header: 'Date', key: 'movementDate', width: 14 },
     { header: 'Reference / Challan No.', key: 'referenceNo', width: 22 },
     { header: 'Remarks', key: 'remarks', width: 28 },
@@ -1086,6 +1093,7 @@ async function buildReceiveImportTemplate() {
     supplierName: 'ABC Traders',
     amount: 1500,
     quantity: 10,
+    unit: 'Metres',
     movementDate: '2026-09-07',
     referenceNo: 'CH-001',
     remarks: 'Sample receive row',
@@ -1096,6 +1104,7 @@ async function buildReceiveImportTemplate() {
     supplierName: 'XYZ Supplies',
     amount: 500,
     quantity: 5,
+    unit: 'Nos',
     movementDate: '2026-09-07',
     referenceNo: '',
     remarks: '',
@@ -1129,6 +1138,12 @@ async function parseReceiveWorkbook(file) {
   const supplierCol = findColumnIndex(headerRow, ['supplier name', 'supplier']);
   const amountCol = findColumnIndex(headerRow, ['amount']);
   const quantityCol = findColumnIndex(headerRow, ['quantity', 'qty']);
+  const unitCol = findColumnIndex(headerRow, [
+    'uom',
+    'unit',
+    'unit of measurement',
+    'unit of measurement (uom)',
+  ]);
   const dateCol = findColumnIndex(headerRow, ['date', 'movement date', 'receive date']);
   const referenceCol = findColumnIndex(headerRow, [
     'reference / challan no.',
@@ -1168,6 +1183,7 @@ async function parseReceiveWorkbook(file) {
     const referenceNo =
       referenceCol === -1 ? '' : String(row.getCell(referenceCol).value || '').trim();
     const remarks = remarksCol === -1 ? '' : String(row.getCell(remarksCol).value || '').trim();
+    const unit = unitCol === -1 ? '' : String(row.getCell(unitCol).value || '').trim();
 
     if (!componentName && !stockItemLabel && !supplierName && quantityEmpty && amountEmpty) return;
     rows.push({
@@ -1179,6 +1195,7 @@ async function parseReceiveWorkbook(file) {
       amount,
       amountEmpty,
       quantity,
+      unit,
       movementDate,
       referenceNo,
       remarks,
@@ -1223,6 +1240,7 @@ async function bulkImportReceives(file, actorId) {
           supplierName: row.supplierName,
           amount: row.amount,
           quantity: row.quantity,
+          unit: row.unit,
           movementDate: row.movementDate,
           referenceNo: row.referenceNo,
           remarks: row.remarks,
