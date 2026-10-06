@@ -15,6 +15,7 @@ const fileSchema = new Schema(
 /** Product catalogue used when building quotations (alongside Items Master). */
 const quotationProductSchema = new Schema(
   {
+    legacySupabaseId: { type: String, default: null, index: true},
     modelNo: { type: String, default: '', trim: true },
     description: { type: String, default: '', trim: true },
     price: { type: Number, default: 0, min: 0 },

@@ -1,5 +1,27 @@
+const dns = require('dns');
 const mongoose = require('mongoose');
 const env = require('./env');
+
+// Some routers/ISP resolvers refuse SRV lookups needed by mongodb+srv:// URIs.
+const DNS_FAILURE_CODES = new Set(['EREFUSED', 'ETIMEOUT', 'ESERVFAIL', 'ECONNREFUSED']);
+const FALLBACK_DNS_SERVERS = ['8.8.8.8', '1.1.1.1'];
+
+function isSrvLookupFailure(err) {
+  return DNS_FAILURE_CODES.has(err?.code) && /query(Srv|Txt)/.test(`${err?.syscall || ''} ${err?.message || ''}`);
+}
+
+async function connectWithDnsFallback() {
+  try {
+    return await mongoose.connect(env.mongodbUri, connectOptions);
+  } catch (err) {
+    if (!isSrvLookupFailure(err)) throw err;
+    // eslint-disable-next-line no-console
+    console.warn(`[db] DNS lookup failed (${err.code}); retrying with public DNS ${FALLBACK_DNS_SERVERS.join(', ')}`);
+    dns.setServers(FALLBACK_DNS_SERVERS);
+    dns.promises.setServers(FALLBACK_DNS_SERVERS);
+    return mongoose.connect(env.mongodbUri, connectOptions);
+  }
+}
 
 /**
  * Cache on globalThis so Vercel warm invocations reuse one connection.
@@ -41,8 +63,7 @@ async function connectDB() {
       readyState: mongoose.connection.readyState,
     });
 
-    cache.promise = mongoose
-      .connect(env.mongodbUri, connectOptions)
+    cache.promise = connectWithDnsFallback()
       .then((m) => {
         // eslint-disable-next-line no-console
         console.log('[db] MongoDB connected:', m.connection.name);
