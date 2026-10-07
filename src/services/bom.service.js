@@ -6,6 +6,7 @@ const bomProductionRepository = require('../repositories/bomProduction.repositor
 const stockItemRepository = require('../repositories/stockItem.repository');
 const stockService = require('./stock.service');
 const BomProduction = require('../models/BomProduction.model');
+const StockMovement = require('../models/StockMovement.model');
 const ApiError = require('../utils/ApiError');
 const { buildPagination, buildSort, buildPaginatedResult } = require('../utils/pagination');
 
@@ -138,6 +139,19 @@ async function updateBom(id, data, actorId) {
   const name = data.name !== undefined ? String(data.name || '').trim() : existing.name;
   if (!name) throw new ApiError(400, 'BOM name is required');
 
+  // Compare against production lines too, so components removed before this sync existed are caught.
+  const remainingItemIds = new Set(components.map((component) => String(component.stockItem)));
+  const productionItemIds = await BomProduction.distinct('lines.stockItem', { bom: existing._id });
+  const removedItemIds = [
+    ...new Set(
+      [...(existing.components || []).map((component) => component.stockItem), ...productionItemIds]
+        .map(String)
+        .filter((itemId) => mongoose.Types.ObjectId.isValid(itemId) && !remainingItemIds.has(itemId))
+    ),
+  ];
+
+  const removal = await removeComponentsFromProductions(id, removedItemIds);
+
   await bomRepository.updateById(id, {
     name,
     finishedItem: finishedItemId,
@@ -149,7 +163,78 @@ async function updateBom(id, data, actorId) {
     components,
     updatedBy: actorId,
   });
-  return getBomById(id);
+  const adjustedProductions = removal.productions.length ? await applyComponentRemoval(removal) : 0;
+  return { bom: await getBomById(id), adjustedProductions };
+}
+
+function personKey(name) {
+  return String(name || '')
+    .trim()
+    .toLowerCase();
+}
+
+/**
+ * Drops removed BOM components from every production of this BOM (pending and completed) and
+ * deletes the utilize movements those lines created, so the issued qty goes back to the warehouse.
+ */
+async function removeComponentsFromProductions(bomId, removedItemIds) {
+  if (!removedItemIds.length) return { productions: [], movementIds: [] };
+  const removed = new Set(removedItemIds);
+  const productions = await BomProduction.find({
+    bom: bomId,
+    'lines.stockItem': { $in: removedItemIds },
+  });
+  if (!productions.length) return { productions: [], movementIds: [] };
+
+  const linkedMovementIds = productions.flatMap((production) => (production.movements || []).map(String));
+  const movements = linkedMovementIds.length
+    ? await StockMovement.find({ _id: { $in: linkedMovementIds }, stockItem: { $in: removedItemIds } })
+    : [];
+
+  // Validate every reversal up front so we never delete half of them.
+  const totals = new Map();
+  movements.forEach((movement) => {
+    const key = `${movement.stockItem}|${personKey(movement.issuedTo)}`;
+    const entry = totals.get(key) || { stockItem: movement.stockItem, person: movement.issuedTo, quantity: 0 };
+    entry.quantity += qty(movement.quantity);
+    totals.set(key, entry);
+  });
+  for (const entry of totals.values()) {
+    if (!entry.person) continue;
+    const balances = await stockService.getBalances(entry.stockItem);
+    const holding = balances.personQtys[personKey(entry.person)]?.holding || 0;
+    if (entry.quantity > holding + 1e-9) {
+      const item = await stockItemRepository.findById(entry.stockItem);
+      throw new ApiError(
+        400,
+        `Cannot remove "${itemDisplayName(item)}" from this BOM: ${entry.person} has already returned part of the quantity issued for it in earlier productions.`
+      );
+    }
+  }
+
+  return { productions, movementIds: movements.map((movement) => String(movement._id)), removed };
+}
+
+async function applyComponentRemoval({ productions, movementIds, removed }) {
+  for (const movementId of movementIds) {
+    await stockService.removeMovement(movementId);
+  }
+  const deletedMovements = new Set(movementIds);
+
+  for (const production of productions) {
+    const lines = production.lines.filter((line) => !removed.has(String(line.stockItem)));
+    const movements = (production.movements || []).filter((id) => !deletedMovements.has(String(id)));
+    if (lines.length === 0) {
+      await BomProduction.deleteOne({ _id: production._id });
+      continue;
+    }
+    production.lines = lines;
+    production.movements = movements;
+    production.status = lines.some((line) => qty(line.pendingQty) > 0) ? 'pending' : 'completed';
+    production.markModified('lines');
+    await production.save();
+  }
+  return productions.length;
 }
 
 async function removeBom(id) {

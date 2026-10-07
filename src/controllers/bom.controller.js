@@ -18,8 +18,11 @@ const createBom = asyncHandler(async (req, res) => {
 });
 
 const updateBom = asyncHandler(async (req, res) => {
-  const bom = await bomService.updateBom(req.params.id, req.body, req.user._id);
-  sendSuccess(res, { message: 'BOM updated', data: bom });
+  const { bom, adjustedProductions } = await bomService.updateBom(req.params.id, req.body, req.user._id);
+  const message = adjustedProductions
+    ? `BOM updated. Removed components were dropped from ${adjustedProductions} production(s) and their issued quantity was returned to the warehouse.`
+    : 'BOM updated';
+  sendSuccess(res, { message, data: bom });
 });
 
 const removeBom = asyncHandler(async (req, res) => {
