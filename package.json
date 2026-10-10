@@ -9,7 +9,10 @@
     "start": "node src/server.js",
     "seed": "node src/scripts/seed.js",
     "migrate:products": "node src/scripts/migrateProducts.js",
-    "migrate:parties": "node src/scripts/migrateParties.js"
+    "migrate:parties": "node src/scripts/migrateParties.js",
+    "migrate:quotations": "node src/scripts/migrateQuotations.js",
+    "migrate:companies": "node src/scripts/migrateCompanies.js",
+    "migrate:terms": "node src/scripts/migrateTerms.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

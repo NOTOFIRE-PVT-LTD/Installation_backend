@@ -2,9 +2,19 @@ const quotationService = require('../services/quotation.service');
 const asyncHandler = require('../utils/asyncHandler');
 const { sendSuccess } = require('../utils/ApiResponse');
 
+function quotationScope(user) {
+  if (!user?.permissions?.quotationsOwnOnly) return null;
+  return { userId: user._id, userName: user.name };
+}
+
 const listMasters = asyncHandler(async (req, res) => {
-  const items = await quotationService.listMasters(req.params.kind);
-  sendSuccess(res, { message: 'Records fetched', data: items });
+  const result = await quotationService.listMasters(req.params.kind, req.query);
+  if (Array.isArray(result)) {
+    sendSuccess(res, { message: 'Records fetched', data: result });
+    return;
+  }
+  const { items, ...meta } = result;
+  sendSuccess(res, { message: 'Records fetched', data: items, meta });
 });
 
 const createMaster = asyncHandler(async (req, res) => {
@@ -53,12 +63,12 @@ const productOptions = asyncHandler(async (_req, res) => {
 });
 
 const listQuotations = asyncHandler(async (req, res) => {
-  const result = await quotationService.listQuotations(req.query);
+  const result = await quotationService.listQuotations(req.query, quotationScope(req.user));
   sendSuccess(res, { message: 'Quotations fetched', data: result.items, meta: result });
 });
 
 const getQuotationById = asyncHandler(async (req, res) => {
-  const quotation = await quotationService.getQuotationById(req.params.id);
+  const quotation = await quotationService.getQuotationById(req.params.id, quotationScope(req.user));
   sendSuccess(res, { message: 'Quotation fetched', data: quotation });
 });
 
@@ -68,32 +78,42 @@ const createQuotation = asyncHandler(async (req, res) => {
 });
 
 const updateQuotation = asyncHandler(async (req, res) => {
-  const quotation = await quotationService.updateQuotation(req.params.id, req.body, req.user._id);
+  const quotation = await quotationService.updateQuotation(
+    req.params.id,
+    req.body,
+    req.user._id,
+    quotationScope(req.user)
+  );
   sendSuccess(res, { message: 'Quotation updated', data: quotation });
 });
 
 const duplicateQuotation = asyncHandler(async (req, res) => {
-  const quotation = await quotationService.duplicateQuotation(req.params.id, req.user._id);
+  const quotation = await quotationService.duplicateQuotation(req.params.id, req.user._id, quotationScope(req.user));
   sendSuccess(res, { statusCode: 201, message: 'Quotation duplicated', data: quotation });
 });
 
 const setStatus = asyncHandler(async (req, res) => {
-  const quotation = await quotationService.setStatus(req.params.id, req.body.status, req.user._id);
+  const quotation = await quotationService.setStatus(
+    req.params.id,
+    req.body.status,
+    req.user._id,
+    quotationScope(req.user)
+  );
   sendSuccess(res, { message: 'Status updated', data: quotation });
 });
 
 const moveToTrash = asyncHandler(async (req, res) => {
-  await quotationService.moveToTrash(req.params.id, req.user._id);
+  await quotationService.moveToTrash(req.params.id, req.user._id, quotationScope(req.user));
   sendSuccess(res, { message: 'Quotation moved to trash' });
 });
 
 const restoreFromTrash = asyncHandler(async (req, res) => {
-  const quotation = await quotationService.restoreFromTrash(req.params.id, req.user._id);
+  const quotation = await quotationService.restoreFromTrash(req.params.id, req.user._id, quotationScope(req.user));
   sendSuccess(res, { message: 'Quotation restored', data: quotation });
 });
 
 const deletePermanently = asyncHandler(async (req, res) => {
-  await quotationService.deletePermanently(req.params.id);
+  await quotationService.deletePermanently(req.params.id, quotationScope(req.user));
   sendSuccess(res, { message: 'Quotation deleted permanently' });
 });
 

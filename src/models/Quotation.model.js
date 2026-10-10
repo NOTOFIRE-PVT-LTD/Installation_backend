@@ -34,7 +34,9 @@ const quotationItemSchema = new Schema(
 
 const quotationSchema = new Schema(
   {
+    legacySupabaseId: {type: String,default: null,index: true},    
     quotationNo: { type: String, required: true, unique: true, trim: true },
+    quotationSuffix: { type: String, default: '',trim: true},
     seq: { type: Number, required: true },
     seqYear: { type: Number, required: true },
     quotationDate: { type: Date, default: Date.now },

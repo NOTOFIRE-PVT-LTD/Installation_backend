@@ -8,7 +8,18 @@ const quotationValidator = require('../validators/quotation.validator');
 const { ROLES } = require('../config/constants');
 const { uploadQuotationProductFiles } = require('../middlewares/upload.middleware');
 
+const ApiError = require('../utils/ApiError');
+
 const router = express.Router();
+
+function denyQuotationUser(action) {
+  return (req, _res, next) => {
+    if (req.user?.permissions?.quotationsOwnOnly) {
+      return next(new ApiError(403, `Quotation users cannot ${action} products, companies, parties or terms`));
+    }
+    next();
+  };
+}
 
 router.use(authenticate, requireRole(ROLES.ADMIN), requirePermission('quotations'));
 
@@ -19,16 +30,32 @@ router.get('/products/categories', quotationController.productCategories);
 router.post('/products', uploadQuotationProductFiles, quotationController.createProduct);
 router.put(
   '/products/:id',
+  denyQuotationUser('edit'),
   uploadQuotationProductFiles,
   validate(quotationValidator.idParam),
   quotationController.updateProduct
 );
-router.delete('/products/:id', validate(quotationValidator.idParam), quotationController.removeProduct);
+router.delete(
+  '/products/:id',
+  denyQuotationUser('delete'),
+  validate(quotationValidator.idParam),
+  quotationController.removeProduct
+);
 
 router.get('/masters/:kind', validate(quotationValidator.masterKindParam), quotationController.listMasters);
 router.post('/masters/:kind', validate(quotationValidator.masterCreate), quotationController.createMaster);
-router.put('/masters/item/:id', validate(quotationValidator.masterUpdate), quotationController.updateMaster);
-router.delete('/masters/item/:id', validate(quotationValidator.idParam), quotationController.removeMaster);
+router.put(
+  '/masters/item/:id',
+  denyQuotationUser('edit'),
+  validate(quotationValidator.masterUpdate),
+  quotationController.updateMaster
+);
+router.delete(
+  '/masters/item/:id',
+  denyQuotationUser('delete'),
+  validate(quotationValidator.idParam),
+  quotationController.removeMaster
+);
 
 router.get('/', validate(quotationValidator.quotationList), quotationController.listQuotations);
 router.post('/', validate(quotationValidator.quotationCreate), quotationController.createQuotation);

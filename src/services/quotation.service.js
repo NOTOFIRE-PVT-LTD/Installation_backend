@@ -34,12 +34,34 @@ function assertKind(kind) {
   if (!QUOTATION_MASTER_KINDS.includes(kind)) throw new ApiError(400, 'Invalid master type');
 }
 
-async function listMasters(kind) {
+const MASTER_SEARCH_FIELDS = ['name', 'gstin', 'contactPerson', 'phone', 'email', 'address', 'content'];
+
+/** Returns every record when no page is requested (dropdowns); otherwise a paginated, searchable result. */
+async function listMasters(kind, query = {}) {
   assertKind(kind);
-  return quotationMasterRepository.find({ kind, isActive: true }, { sort: { name: 1 } });
+  const filter = { kind, isActive: true };
+  const terms = text(query.search).split(/\s+/).filter(Boolean);
+  if (terms.length) {
+    filter.$and = terms.map((term) => {
+      const regex = new RegExp(escapeRegex(term), 'i');
+      return { $or: MASTER_SEARCH_FIELDS.map((field) => ({ [field]: regex })) };
+    });
+  }
+  if (query.page === undefined && query.pageSize === undefined) {
+    return quotationMasterRepository.find(filter, { sort: { name: 1 } });
+  }
+  const { page, pageSize, skip } = buildPagination(query);
+  const { items, total } = await quotationMasterRepository.paginate({
+    filter,
+    sort: { name: 1 },
+    skip,
+    limit: pageSize,
+  });
+  return buildPaginatedResult({ items, total, page, pageSize });
 }
 
 function masterPayload(data) {
+  const bank = data.bank || {};
   return {
     name: text(data.name),
     gstin: text(data.gstin).toUpperCase(),
@@ -48,6 +70,14 @@ function masterPayload(data) {
     email: text(data.email),
     address: text(data.address),
     content: text(data.content),
+    code: text(data.code).toUpperCase(),
+    bank: {
+      accountName: text(bank.accountName),
+      accountNo: text(bank.accountNo),
+      bankName: text(bank.bankName),
+      ifsc: text(bank.ifsc).toUpperCase(),
+      branch: text(bank.branch),
+    },
   };
 }
 
@@ -333,20 +363,50 @@ function listFilter(query) {
   return filter;
 }
 
-async function listQuotations(query) {
+/**
+ * `scope` is null for full access; for quotation users it is { userId, userName } and limits
+ * them to quotations they created or that name them as "Prepared By".
+ */
+function ownerCondition(scope) {
+  if (!scope) return null;
+  const conditions = [{ createdBy: scope.userId }];
+  const name = text(scope.userName);
+  if (name) conditions.push({ preparedBy: new RegExp(`^\\s*${escapeRegex(name)}\\s*$`, 'i') });
+  return { $or: conditions };
+}
+
+function withOwner(filter, scope) {
+  const owner = ownerCondition(scope);
+  if (!owner) return filter;
+  return { ...filter, $and: [...(filter.$and || []), owner] };
+}
+
+function isOwner(quotation, scope) {
+  if (!scope) return true;
+  if (quotation.createdBy && String(quotation.createdBy) === String(scope.userId)) return true;
+  const name = text(scope.userName).toLowerCase();
+  return Boolean(name) && text(quotation.preparedBy).toLowerCase() === name;
+}
+
+async function listQuotations(query, scope = null) {
   const { page, pageSize, skip } = buildPagination(query, { maxPageSize: QUOTATION_MAX_PAGE_SIZE });
   const sort = buildSort(query, QUOTATION_SORT);
-  const { items, total } = await quotationRepository.paginate({ filter: listFilter(query), sort, skip, limit: pageSize });
+  const { items, total } = await quotationRepository.paginate({
+    filter: withOwner(listFilter(query), scope),
+    sort,
+    skip,
+    limit: pageSize,
+  });
   const [activeCount, trashCount] = await Promise.all([
-    quotationRepository.countDocuments({ isDeleted: false }),
-    quotationRepository.countDocuments({ isDeleted: true }),
+    quotationRepository.countDocuments(withOwner({ isDeleted: false }, scope)),
+    quotationRepository.countDocuments(withOwner({ isDeleted: true }, scope)),
   ]);
   return { ...buildPaginatedResult({ items, total, page, pageSize }), counts: { active: activeCount, trash: trashCount } };
 }
 
-async function getQuotationById(id) {
+async function getQuotationById(id, scope = null) {
   const quotation = await quotationRepository.findById(id);
-  if (!quotation) throw new ApiError(404, 'Quotation not found');
+  if (!quotation || !isOwner(quotation, scope)) throw new ApiError(404, 'Quotation not found');
   return quotation;
 }
 
@@ -355,15 +415,15 @@ async function createQuotation(data, actorId) {
   return createWithNumber({ ...fields, status: 'draft' }, actorId);
 }
 
-async function updateQuotation(id, data, actorId) {
-  const existing = await getQuotationById(id);
+async function updateQuotation(id, data, actorId, scope = null) {
+  const existing = await getQuotationById(id, scope);
   if (existing.isDeleted) throw new ApiError(400, 'Restore the quotation from trash before editing');
   const fields = await buildQuotationFields(data);
   return quotationRepository.updateById(id, { ...fields, updatedBy: actorId });
 }
 
-async function duplicateQuotation(id, actorId) {
-  const source = (await getQuotationById(id)).toObject();
+async function duplicateQuotation(id, actorId, scope = null) {
+  const source = (await getQuotationById(id, scope)).toObject();
   const fields = {
     company: source.company,
     party: source.party,
@@ -381,24 +441,24 @@ async function duplicateQuotation(id, actorId) {
   return createWithNumber(fields, actorId);
 }
 
-async function setStatus(id, status, actorId) {
+async function setStatus(id, status, actorId, scope = null) {
   if (!QUOTATION_STATUSES.includes(status)) throw new ApiError(400, 'Invalid status');
-  await getQuotationById(id);
+  await getQuotationById(id, scope);
   return quotationRepository.updateById(id, { status, updatedBy: actorId });
 }
 
-async function moveToTrash(id, actorId) {
-  await getQuotationById(id);
+async function moveToTrash(id, actorId, scope = null) {
+  await getQuotationById(id, scope);
   return quotationRepository.updateById(id, { isDeleted: true, deletedAt: new Date(), updatedBy: actorId });
 }
 
-async function restoreFromTrash(id, actorId) {
-  await getQuotationById(id);
+async function restoreFromTrash(id, actorId, scope = null) {
+  await getQuotationById(id, scope);
   return quotationRepository.updateById(id, { isDeleted: false, deletedAt: null, updatedBy: actorId });
 }
 
-async function deletePermanently(id) {
-  const existing = await getQuotationById(id);
+async function deletePermanently(id, scope = null) {
+  const existing = await getQuotationById(id, scope);
   if (!existing.isDeleted) throw new ApiError(400, 'Move the quotation to trash before deleting permanently');
   await quotationRepository.deleteById(id);
 }

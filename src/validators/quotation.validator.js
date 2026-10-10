@@ -14,6 +14,8 @@ const masterBody = [
   body('email').optional({ checkFalsy: true }).trim().isEmail().withMessage('Invalid email'),
   body('address').optional().trim(),
   body('content').optional().trim(),
+  body('code').optional().trim().isLength({ max: 20 }).withMessage('Code must be at most 20 characters'),
+  body('bank').optional().isObject(),
 ];
 
 const masterCreate = [...masterKindParam, body('name').trim().notEmpty().withMessage('Name is required'), ...masterBody];

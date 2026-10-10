@@ -16,6 +16,15 @@ const quotationMasterSchema = new Schema(
     email: { type: String, default: '', trim: true },
     address: { type: String, default: '', trim: true },
     content: { type: String, default: '', trim: true },
+    // Company only: prefix used in Proforma Invoice numbers (e.g. NF -> NF/PI/...) and bank details printed on PIs.
+    code: { type: String, default: '', trim: true },
+    bank: {
+      accountName: { type: String, default: '', trim: true },
+      accountNo: { type: String, default: '', trim: true },
+      bankName: { type: String, default: '', trim: true },
+      ifsc: { type: String, default: '', trim: true },
+      branch: { type: String, default: '', trim: true },
+    },
     isActive: { type: Boolean, default: true },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     updatedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
