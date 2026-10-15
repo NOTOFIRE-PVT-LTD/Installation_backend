@@ -21,6 +21,7 @@ const MIXED_FIELDS = [
   'billPhoto',
   'visitingCard',
   'productDatasheet',
+  'dcAttachments',
 ];
 const MIXED_MIME_TYPES = [...IMAGE_MIME_TYPES, ...DOCUMENT_MIME_TYPES];
 
@@ -123,8 +124,11 @@ const uploadQuotationProductFiles = upload.fields([
   { name: 'productPicture', maxCount: 1 },
 ]);
 
+const uploadDeliveryChallanFiles = upload.array('dcAttachments', 10);
+
 module.exports = {
   uploadQuotationProductFiles,
+  uploadDeliveryChallanFiles,
   uploadReportFiles,
   uploadProfileImage,
   uploadProjectFiles,

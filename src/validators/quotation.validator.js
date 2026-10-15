@@ -15,6 +15,7 @@ const masterBody = [
   body('address').optional().trim(),
   body('content').optional().trim(),
   body('code').optional().trim().isLength({ max: 20 }).withMessage('Code must be at most 20 characters'),
+  body('cin').optional().trim().isLength({ max: 30 }).withMessage('CIN must be at most 30 characters'),
   body('bank').optional().isObject(),
 ];
 

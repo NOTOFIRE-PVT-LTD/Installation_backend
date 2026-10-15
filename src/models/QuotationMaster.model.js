@@ -18,6 +18,7 @@ const quotationMasterSchema = new Schema(
     content: { type: String, default: '', trim: true },
     // Company only: prefix used in Proforma Invoice numbers (e.g. NF -> NF/PI/...) and bank details printed on PIs.
     code: { type: String, default: '', trim: true },
+    cin: { type: String, default: '', trim: true },
     bank: {
       accountName: { type: String, default: '', trim: true },
       accountNo: { type: String, default: '', trim: true },

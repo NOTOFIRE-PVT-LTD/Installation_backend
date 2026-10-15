@@ -71,6 +71,7 @@ function masterPayload(data) {
     address: text(data.address),
     content: text(data.content),
     code: text(data.code).toUpperCase(),
+    cin: text(data.cin).toUpperCase(),
     bank: {
       accountName: text(bank.accountName),
       accountNo: text(bank.accountNo),

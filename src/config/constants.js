@@ -59,6 +59,7 @@ const PERMISSION_KEYS = Object.freeze([
   // Restricts a quotations user to their own quotations and blocks deleting quotation masters.
   'quotationsOwnOnly',
   'proformaInvoices',
+  'deliveryChallans',
 ]);
 
 const STOCK_MOVEMENT_TYPES = Object.freeze({

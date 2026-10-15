@@ -3,24 +3,9 @@ const quotationMasterRepository = require('../repositories/quotationMaster.repos
 const { PI_TEMPLATES } = require('../models/ProformaInvoice.model');
 const ApiError = require('../utils/ApiError');
 const { buildPagination, buildPaginatedResult } = require('../utils/pagination');
+const { fiscalYearOf, initials, companyCodeOf } = require('../utils/docNumbering');
 
 const PI_MAX_PAGE_SIZE = 500;
-
-const NAME_STOP_WORDS = new Set([
-  'M/S',
-  'MS',
-  'PVT',
-  'PRIVATE',
-  'LTD',
-  'LIMITED',
-  'LLP',
-  'CO',
-  'COMPANY',
-  'AND',
-  '&',
-  'OF',
-  'THE',
-]);
 
 function text(value) {
   return String(value ?? '').trim();
@@ -38,29 +23,6 @@ function round2(value) {
 
 function escapeRegex(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/** Indian financial year (April-March), e.g. 2026-27. */
-function fiscalYearOf(date) {
-  const d = date ? new Date(date) : new Date();
-  const valid = Number.isNaN(d.getTime()) ? new Date() : d;
-  const start = valid.getMonth() >= 3 ? valid.getFullYear() : valid.getFullYear() - 1;
-  return `${start}-${String((start + 1) % 100).padStart(2, '0')}`;
-}
-
-function initials(name, maxLength = 6) {
-  const words = text(name)
-    .replace(/[^A-Za-z0-9&/\s]/g, ' ')
-    .split(/\s+/)
-    .filter((word) => word && !NAME_STOP_WORDS.has(word.toUpperCase()));
-  return words
-    .map((word) => word[0].toUpperCase())
-    .join('')
-    .slice(0, maxLength);
-}
-
-function companyCodeOf(company) {
-  return text(company?.code).toUpperCase() || initials(company?.name, 4) || 'PI';
 }
 
 async function loadMaster(kind, id) {

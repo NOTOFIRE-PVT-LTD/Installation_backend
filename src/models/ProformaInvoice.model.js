@@ -62,6 +62,7 @@ const proformaInvoiceSchema = new Schema(
     preparedBy: { type: String, default: '', trim: true },
     checkedBy: { type: String, default: '', trim: true },
     kindAttention: { type: String, default: '', trim: true },
+    inspectionAuthority: {type: String, default: '', trim: true},
     remarks: { type: String, default: '', trim: true },
     email: { type: String, default: '', trim: true },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },

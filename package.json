@@ -12,7 +12,9 @@
     "migrate:parties": "node src/scripts/migrateParties.js",
     "migrate:quotations": "node src/scripts/migrateQuotations.js",
     "migrate:companies": "node src/scripts/migrateCompanies.js",
-    "migrate:terms": "node src/scripts/migrateTerms.js"
+    "migrate:terms": "node src/scripts/migrateTerms.js",
+    "migrate:proforma-invoices": "node src/scripts/migrateProformaInvoices.js",
+    "migrate:delivery-challans": "node src/scripts/migrateDeliveryChallans.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
