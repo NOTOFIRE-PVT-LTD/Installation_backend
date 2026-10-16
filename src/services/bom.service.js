@@ -52,6 +52,7 @@ async function normalizeComponents(components = []) {
     normalized.push({
       stockItem: item._id,
       qtyPerPcs,
+      unit: String(row.unit || '').trim() || item.unit || 'Nos',
     });
   }
   return normalized;
@@ -284,7 +285,7 @@ async function previewProduction(data) {
       shortage,
       issueNowQty: requiredQty - shortage,
       pendingQty: shortage,
-      unit: item.unit || 'Nos',
+      unit: String(component.unit || '').trim() || item.unit || 'Nos',
     });
   }
 
@@ -700,6 +701,7 @@ async function importComponentsPreview(file) {
       components.push({
         stockItem: item._id,
         qtyPerPcs: row.qtyPerPcs,
+        unit: item.unit || 'Nos',
         label: itemDisplayName(item),
         partNo: item.sku || row.partNo || '',
         component: row.component || item.componentName || item.name,

@@ -6,6 +6,7 @@ const bomComponentSchema = new Schema(
   {
     stockItem: { type: Schema.Types.ObjectId, ref: 'StockItem', required: true },
     qtyPerPcs: { type: Number, required: true, min: 0.0001 },
+    unit: { type: String, default: '', trim: true },
   },
   { _id: true }
 );

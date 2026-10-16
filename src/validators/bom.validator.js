@@ -13,6 +13,7 @@ const componentValidators = [
   body('components').optional().isArray(),
   body('components.*.stockItem').optional().isMongoId(),
   body('components.*.qtyPerPcs').optional().isFloat({ gt: 0 }),
+  body('components.*.unit').optional({ nullable: true }).isString().trim().isLength({ max: 30 }),
 ];
 
 const bomCreate = [
