@@ -165,7 +165,51 @@ async function updateBom(id, data, actorId) {
     updatedBy: actorId,
   });
   const adjustedProductions = removal.productions.length ? await applyComponentRemoval(removal) : 0;
-  return { bom: await getBomById(id), adjustedProductions };
+  const updatedBom = await getBomById(id);
+  const extendedProductions = await addComponentsToProductions(updatedBom);
+  return { bom: updatedBom, adjustedProductions, extendedProductions };
+}
+
+/**
+ * Appends BOM components that a production doesn't have yet (i.e. added to the BOM after the
+ * production was created). Required qty = qty/PCS x production qty. Nothing is issued here —
+ * the new lines start fully pending, so the production becomes 'pending' and the stock is issued
+ * through "Issue Pending" like any other shortage.
+ */
+async function addComponentsToProductions(bom) {
+  const components = (bom.components || []).filter((component) => component.stockItem?._id);
+  if (!components.length) return 0;
+
+  const productions = await BomProduction.find({ bom: bom._id });
+  let extended = 0;
+  for (const production of productions) {
+    const existingItemIds = new Set(production.lines.map((line) => String(line.stockItem)));
+    const missing = components.filter((component) => !existingItemIds.has(String(component.stockItem._id)));
+    if (!missing.length) continue;
+
+    const productionQty = qty(production.productionQty);
+    for (const component of missing) {
+      const item = component.stockItem;
+      const qtyPerPcs = qty(component.qtyPerPcs);
+      const requiredQty = qtyPerPcs * productionQty;
+      const balances = await stockService.getBalances(item._id);
+      production.lines.push({
+        stockItem: item._id,
+        itemName: itemDisplayName(item),
+        qtyPerPcs,
+        requiredQty,
+        availableQty: balances.warehouseQty,
+        issuedQty: 0,
+        pendingQty: requiredQty,
+        unit: String(component.unit || '').trim() || item.unit || 'Nos',
+      });
+    }
+    production.status = 'pending';
+    production.markModified('lines');
+    await production.save();
+    extended += 1;
+  }
+  return extended;
 }
 
 function personKey(name) {
@@ -725,6 +769,7 @@ module.exports = {
   getBomById,
   createBom,
   updateBom,
+  addComponentsToProductions,
   removeBom,
   previewProduction,
   confirmProduction,

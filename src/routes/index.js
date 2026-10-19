@@ -24,6 +24,7 @@ const billingRoutes = require('./billing.routes');
 const quotationRoutes = require('./quotation.routes');
 const proformaInvoiceRoutes = require('./proformaInvoice.routes');
 const deliveryChallanRoutes = require('./deliveryChallan.routes');
+const atlantaPaymentRoutes = require('./atlantaPayment.routes');
 
 const router = express.Router();
 
@@ -52,5 +53,6 @@ router.use('/billing', billingRoutes);
 router.use('/quotations', quotationRoutes);
 router.use('/proforma-invoices', proformaInvoiceRoutes);
 router.use('/delivery-challans', deliveryChallanRoutes);
+router.use('/atlanta-payments', atlantaPaymentRoutes);
 
 module.exports = router;

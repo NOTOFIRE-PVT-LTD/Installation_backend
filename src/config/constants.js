@@ -60,6 +60,7 @@ const PERMISSION_KEYS = Object.freeze([
   'quotationsOwnOnly',
   'proformaInvoices',
   'deliveryChallans',
+  'atlantaPayments',
 ]);
 
 const STOCK_MOVEMENT_TYPES = Object.freeze({
