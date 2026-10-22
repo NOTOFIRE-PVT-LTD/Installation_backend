@@ -59,35 +59,44 @@ const paymentReceivedSchema = new Schema(
 
 const atlantaPaymentSchema = new Schema(
   {
+    legacySupabaseId: { type: String, default: null, trim: true },
     fileName: { type: String, required: true, trim: true },
     consigneeName: { type: String, default: '', trim: true },
     crnDate: { type: Date, default: null },
     paymentDate: { type: Date, default: null },
+    employeeId: { type: String, default: '', trim: true },
+    department: { type: String, default: '', trim: true },
 
+    paymentDetails: { type: String, default: '' },
+    paymentReceivedDate: { type: String, default: '' },
+
+    workMaterialItems: {
+      type: [Schema.Types.Mixed],
+      default: [],
+    },
+
+    sourceData: {
+      type: Schema.Types.Mixed,
+      default: {},
+    },
     employeeName: { type: String, required: true, trim: true },
     designation: { type: String, default: '', trim: true },
-
     travelStartAt: { type: Date, default: null },
     reachedAt: { type: Date, default: null },
     exitAt: { type: Date, default: null },
     travelDays: { type: Number, default: 0, min: 0 },
     ratePerDay: money,
     totalTada: money,
-
     invoiceEntries: { type: [invoiceEntrySchema], default: [] },
     totalBasicAmount: money,
     totalInvoiceAmount: money,
     totalExpense: money,
-
     travelExpenses: { type: [travelExpenseSchema], default: [] },
     totalTravelExpenses: money,
-
     paymentsReceived: { type: [paymentReceivedSchema], default: [] },
     totalReceivedAmount: money,
-
     // Total TADA + invoice expenses + travel expenses - total received (can go negative = overpaid).
     amountToGive: { type: Number, default: 0 },
-
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     updatedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
   },
@@ -96,5 +105,9 @@ const atlantaPaymentSchema = new Schema(
 
 atlantaPaymentSchema.index({ createdAt: -1 });
 atlantaPaymentSchema.index({ fileName: 1 });
+atlantaPaymentSchema.index(
+  { legacySupabaseId: 1 },
+  { unique: true, sparse: true }
+);
 
 module.exports = mongoose.model('AtlantaPayment', atlantaPaymentSchema);

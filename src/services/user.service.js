@@ -66,9 +66,16 @@ async function create(data, file, actorId) {
     updatedBy: actorId,
   });
 
-  if (user.role === ROLES.ADMIN) {
+  if (user.role === ROLES.ADMIN || data.permissions) {
     const permission = await permissionService.createDefaultPermissions(user._id, { actorId });
     user.permissions = permission._id;
+    if (data.permissions) {
+      let parsed = data.permissions;
+      if (typeof parsed === 'string') {
+        try { parsed = JSON.parse(parsed); } catch { parsed = {}; }
+      }
+      await permissionService.updatePermissions(user._id, parsed, actorId);
+    }
     await user.save();
   }
 
@@ -92,6 +99,18 @@ async function update(id, data, file, actorId) {
       const permission = await permissionService.createDefaultPermissions(user._id, { actorId });
       updates.permissions = permission._id;
     }
+  }
+
+  if (data.permissions) {
+    let parsed = data.permissions;
+    if (typeof parsed === 'string') {
+      try { parsed = JSON.parse(parsed); } catch { parsed = {}; }
+    }
+    if (!user.permissions) {
+      const permission = await permissionService.createDefaultPermissions(user._id, { actorId });
+      updates.permissions = permission._id;
+    }
+    await permissionService.updatePermissions(user._id, parsed, actorId);
   }
 
   if (file) {

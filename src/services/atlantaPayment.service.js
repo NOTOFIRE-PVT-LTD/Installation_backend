@@ -182,7 +182,35 @@ function buildFields(data, invoiceEntries, travelExpenses, paymentsReceived) {
   };
 }
 
-async function listAtlantaPayments(query = {}) {
+function ownerCondition(scope) {
+  if (!scope) return null;
+  const conditions = [];
+  if (scope.userId) {
+    conditions.push({ createdBy: scope.userId });
+    conditions.push({ employeeId: String(scope.userId) });
+  }
+  const name = text(scope.userName);
+  if (name) {
+    conditions.push({ employeeName: new RegExp(`^\\s*${escapeRegex(name)}\\s*$`, 'i') });
+  }
+  return { $or: conditions };
+}
+
+function withOwner(filter, scope) {
+  const owner = ownerCondition(scope);
+  if (!owner) return filter;
+  return { ...filter, $and: [...(filter.$and || []), owner] };
+}
+
+function isOwner(payment, scope) {
+  if (!scope) return true;
+  if (payment.createdBy && String(payment.createdBy) === String(scope.userId)) return true;
+  if (payment.employeeId && String(payment.employeeId) === String(scope.userId)) return true;
+  const name = text(scope.userName).toLowerCase();
+  return Boolean(name) && text(payment.employeeName).toLowerCase() === name;
+}
+
+async function listAtlantaPayments(query = {}, scope = null) {
   const { page, pageSize, skip } = buildPagination(query, { maxPageSize: MAX_PAGE_SIZE });
   const filter = {};
   const terms = text(query.search).split(/\s+/).filter(Boolean);
@@ -192,8 +220,9 @@ async function listAtlantaPayments(query = {}) {
       return { $or: [{ fileName: regex }, { consigneeName: regex }, { employeeName: regex }, { designation: regex }] };
     });
   }
+  const finalFilter = withOwner(filter, scope);
   const { items, total } = await atlantaPaymentRepository.paginate({
-    filter,
+    filter: finalFilter,
     sort: { createdAt: -1 },
     skip,
     limit: pageSize,
@@ -201,13 +230,16 @@ async function listAtlantaPayments(query = {}) {
   return buildPaginatedResult({ items, total, page, pageSize });
 }
 
-async function getAtlantaPaymentById(id) {
+async function getAtlantaPaymentById(id, scope = null) {
   const payment = await atlantaPaymentRepository.findById(id);
-  if (!payment) throw new ApiError(404, 'Payment entry not found');
+  if (!payment || !isOwner(payment, scope)) throw new ApiError(404, 'Payment entry not found');
   return payment;
 }
 
-async function createAtlantaPayment(data, files = [], actorId) {
+async function createAtlantaPayment(data, files = [], actorId, scope = null) {
+  if (scope && (!data.employeeName || !data.employeeName.trim())) {
+    data.employeeName = scope.userName;
+  }
   validate(data);
   const invoiceEntries = buildInvoiceEntries(data.invoiceEntries);
   const paymentsReceived = buildPaymentsReceived(data.paymentsReceived);
@@ -216,6 +248,7 @@ async function createAtlantaPayment(data, files = [], actorId) {
   try {
     return await atlantaPaymentRepository.create({
       ...buildFields(data, invoiceEntries, expenses, paymentsReceived),
+      employeeId: data.employeeId || (scope ? String(actorId) : ''),
       createdBy: actorId,
       updatedBy: actorId,
     });
@@ -225,8 +258,11 @@ async function createAtlantaPayment(data, files = [], actorId) {
   }
 }
 
-async function updateAtlantaPayment(id, data, files = [], actorId) {
-  const existing = await getAtlantaPaymentById(id);
+async function updateAtlantaPayment(id, data, files = [], actorId, scope = null) {
+  const existing = await getAtlantaPaymentById(id, scope);
+  if (scope && (!data.employeeName || !data.employeeName.trim())) {
+    data.employeeName = existing.employeeName || scope.userName;
+  }
   validate(data);
   const invoiceEntries = buildInvoiceEntries(data.invoiceEntries);
   const paymentsReceived = buildPaymentsReceived(data.paymentsReceived);
@@ -246,8 +282,8 @@ async function updateAtlantaPayment(id, data, files = [], actorId) {
   return saved;
 }
 
-async function removeAtlantaPayment(id) {
-  const existing = await getAtlantaPaymentById(id);
+async function removeAtlantaPayment(id, scope = null) {
+  const existing = await getAtlantaPaymentById(id, scope);
   await atlantaPaymentRepository.deleteById(id);
   await deleteProofs(existing.travelExpenses.map((expense) => expense.proof));
 }

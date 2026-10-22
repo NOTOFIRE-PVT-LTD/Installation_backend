@@ -221,9 +221,23 @@ function parseLocation(data) {
   if (!data.location) return { latitude: null, longitude: null, address: '' };
   try {
     const parsed = typeof data.location === 'string' ? JSON.parse(data.location) : data.location;
+    const lat =
+      parsed.latitude !== null &&
+      parsed.latitude !== undefined &&
+      String(parsed.latitude).trim() !== '' &&
+      Number.isFinite(Number(parsed.latitude))
+        ? Number(parsed.latitude)
+        : null;
+    const lng =
+      parsed.longitude !== null &&
+      parsed.longitude !== undefined &&
+      String(parsed.longitude).trim() !== '' &&
+      Number.isFinite(Number(parsed.longitude))
+        ? Number(parsed.longitude)
+        : null;
     return {
-      latitude: parsed.latitude ?? null,
-      longitude: parsed.longitude ?? null,
+      latitude: lat,
+      longitude: lng,
       address: toText(parsed.address),
     };
   } catch {

@@ -3,6 +3,18 @@ const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const { sendSuccess } = require('../utils/ApiResponse');
 
+const { ROLES } = require('../config/constants');
+
+function atlantaPaymentScope(user) {
+  if (user?.role === ROLES.ADMIN && !user?.permissions?.atlantaPaymentsOwnOnly) {
+    return null;
+  }
+  return {
+    userId: user?._id,
+    userName: user?.name,
+  };
+}
+
 /** Form data arrives as multipart (for proof files) with the fields JSON-encoded in `payload`. */
 function parsePayload(req) {
   if (typeof req.body?.payload !== 'string') return req.body || {};
@@ -14,27 +26,47 @@ function parsePayload(req) {
 }
 
 const list = asyncHandler(async (req, res) => {
-  const { items, ...meta } = await atlantaPaymentService.listAtlantaPayments(req.query);
+  const { items, ...meta } = await atlantaPaymentService.listAtlantaPayments(
+    req.query,
+    atlantaPaymentScope(req.user)
+  );
   sendSuccess(res, { message: 'Payment entries fetched', data: items, meta });
 });
 
 const getById = asyncHandler(async (req, res) => {
-  const payment = await atlantaPaymentService.getAtlantaPaymentById(req.params.id);
+  const payment = await atlantaPaymentService.getAtlantaPaymentById(
+    req.params.id,
+    atlantaPaymentScope(req.user)
+  );
   sendSuccess(res, { message: 'Payment entry fetched', data: payment });
 });
 
 const create = asyncHandler(async (req, res) => {
-  const payment = await atlantaPaymentService.createAtlantaPayment(parsePayload(req), req.files, req.user._id);
+  const payment = await atlantaPaymentService.createAtlantaPayment(
+    parsePayload(req),
+    req.files,
+    req.user._id,
+    atlantaPaymentScope(req.user)
+  );
   sendSuccess(res, { statusCode: 201, message: 'Payment entry created', data: payment });
 });
 
 const update = asyncHandler(async (req, res) => {
-  const payment = await atlantaPaymentService.updateAtlantaPayment(req.params.id, parsePayload(req), req.files, req.user._id);
+  const payment = await atlantaPaymentService.updateAtlantaPayment(
+    req.params.id,
+    parsePayload(req),
+    req.files,
+    req.user._id,
+    atlantaPaymentScope(req.user)
+  );
   sendSuccess(res, { message: 'Payment entry updated', data: payment });
 });
 
 const remove = asyncHandler(async (req, res) => {
-  await atlantaPaymentService.removeAtlantaPayment(req.params.id);
+  await atlantaPaymentService.removeAtlantaPayment(
+    req.params.id,
+    atlantaPaymentScope(req.user)
+  );
   sendSuccess(res, { message: 'Payment entry deleted' });
 });
 

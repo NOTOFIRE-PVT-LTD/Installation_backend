@@ -1,7 +1,8 @@
 const permissionRepository = require('../repositories/permission.repository');
 const { PERMISSION_KEYS, ROLES } = require('../config/constants');
 
-const INSTALLER_PERMISSION_KEYS = ['projects', 'reports', 'cadDrawing'];
+const DEFAULT_INSTALLER_MODULES = ['projects', 'reports', 'cadDrawing'];
+const INSTALLER_PERMISSION_KEYS = ['projects', 'reports', 'cadDrawing', 'atlantaPayments', 'atlantaPaymentsOwnOnly'];
 
 function serializePermissions(user) {
   if (user.role === ROLES.ADMIN) {
@@ -14,11 +15,15 @@ function serializePermissions(user) {
   }
 
   // Installers default to full access for their workspace modules until an Admin explicitly
-  // restricts them.
-  if (!user.permissions) return INSTALLER_PERMISSION_KEYS.reduce((acc, key) => ({ ...acc, [key]: true }), {});
+  // restricts them. Modules like atlantaPayments default to false unless explicitly granted.
+  if (!user.permissions) return DEFAULT_INSTALLER_MODULES.reduce((acc, key) => ({ ...acc, [key]: true }), {});
   const perm = user.permissions;
   return INSTALLER_PERMISSION_KEYS.reduce((acc, key) => {
-    acc[key] = perm[key] !== false;
+    if (DEFAULT_INSTALLER_MODULES.includes(key)) {
+      acc[key] = perm[key] !== false;
+    } else {
+      acc[key] = Boolean(perm[key]);
+    }
     return acc;
   }, {});
 }

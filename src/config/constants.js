@@ -61,6 +61,8 @@ const PERMISSION_KEYS = Object.freeze([
   'proformaInvoices',
   'deliveryChallans',
   'atlantaPayments',
+  // Restricts an Atlanta payments user to their own payment records.
+  'atlantaPaymentsOwnOnly',
 ]);
 
 const STOCK_MOVEMENT_TYPES = Object.freeze({

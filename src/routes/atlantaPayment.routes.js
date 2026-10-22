@@ -1,14 +1,21 @@
 const express = require('express');
 const atlantaPaymentController = require('../controllers/atlantaPayment.controller');
 const authenticate = require('../middlewares/authenticate.middleware');
-const { requireRole } = require('../middlewares/authorize.middleware');
-const { requirePermission } = require('../middlewares/permission.middleware');
 const { uploadAtlantaPaymentProofs } = require('../middlewares/upload.middleware');
-const { ROLES } = require('../config/constants');
+const ApiError = require('../utils/ApiError');
 
 const router = express.Router();
 
-router.use(authenticate, requireRole(ROLES.ADMIN), requirePermission('atlantaPayments'));
+const requireAtlantaPaymentAccess = (req, _res, next) => {
+  if (!req.user) return next(new ApiError(401, 'Authentication required'));
+  const permissions = req.user.permissions;
+  if (!permissions || !permissions.atlantaPayments) {
+    return next(new ApiError(403, 'You do not have permission to access Atlanta Payments'));
+  }
+  next();
+};
+
+router.use(authenticate, requireAtlantaPaymentAccess);
 
 router.get('/', atlantaPaymentController.list);
 router.post('/', uploadAtlantaPaymentProofs, atlantaPaymentController.create);

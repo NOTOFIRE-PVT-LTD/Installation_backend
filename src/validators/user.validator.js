@@ -7,6 +7,7 @@ const create = [
   body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
   body('mobileNumber').trim().notEmpty().withMessage('Mobile number is required'),
   body('role').isIn(Object.values(ROLES)).withMessage('Invalid role'),
+  body('permissions').optional(),
 ];
 
 const update = [
@@ -14,6 +15,7 @@ const update = [
   body('name').optional().trim().notEmpty().withMessage('Name cannot be empty'),
   body('mobileNumber').optional().trim().notEmpty().withMessage('Mobile number cannot be empty'),
   body('role').optional().isIn(Object.values(ROLES)).withMessage('Invalid role'),
+  body('permissions').optional(),
 ];
 
 const idParam = [param('id').isMongoId().withMessage('Invalid user id')];
