@@ -63,6 +63,7 @@ const PERMISSION_KEYS = Object.freeze([
   'atlantaPayments',
   // Restricts an Atlanta payments user to their own payment records.
   'atlantaPaymentsOwnOnly',
+  'auditLogs',
 ]);
 
 const STOCK_MOVEMENT_TYPES = Object.freeze({

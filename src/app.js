@@ -9,6 +9,7 @@ const connectDB = require('./config/db');
 const routes = require('./routes');
 const notFound = require('./middlewares/notFound.middleware');
 const errorHandler = require('./middlewares/errorHandler.middleware');
+const auditLoggerMiddleware = require('./middlewares/auditLogger.middleware');
 
 const app = express();
 
@@ -78,6 +79,7 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+app.use('/api', auditLoggerMiddleware);
 app.use('/api', routes);
 
 app.use(notFound);
