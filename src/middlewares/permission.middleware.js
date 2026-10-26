@@ -10,7 +10,12 @@ function requirePermission(key) {
     }
 
     const permissions = req.user.permissions;
-    if (!permissions || !permissions[key]) {
+    if (!permissions) {
+      return next(new ApiError(403, `You do not have the "${key}" permission`));
+    }
+    const stored = permissions._doc || permissions;
+    // Missing flag = newly added module; only an explicit false in Mongo blocks.
+    if (stored[key] === false) {
       return next(new ApiError(403, `You do not have the "${key}" permission`));
     }
 
@@ -29,7 +34,7 @@ function requirePermissionOrRole(key, ...allowedRoles) {
       if (!allowedRoles.includes(req.user.role)) {
         return next(new ApiError(403, 'You do not have permission to perform this action'));
       }
-      const installerPermissions = req.user.permissions;
+      const installerPermissions = req.user.permissions?._doc || req.user.permissions;
       if (installerPermissions && installerPermissions[key] === false) {
         return next(new ApiError(403, `You do not have the "${key}" permission`));
       }
@@ -37,7 +42,11 @@ function requirePermissionOrRole(key, ...allowedRoles) {
     }
 
     const permissions = req.user.permissions;
-    if (!permissions || !permissions[key]) {
+    if (!permissions) {
+      return next(new ApiError(403, `You do not have the "${key}" permission`));
+    }
+    const stored = permissions._doc || permissions;
+    if (stored[key] === false) {
       return next(new ApiError(403, `You do not have the "${key}" permission`));
     }
     next();

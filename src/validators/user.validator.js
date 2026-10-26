@@ -1,5 +1,5 @@
 const { body, param, query } = require('express-validator');
-const { ROLES, USER_STATUS, PERMISSION_KEYS } = require('../config/constants');
+const { ROLES, USER_STATUS, PERMISSION_KEYS, ADMIN_TYPES, JOB_ROLES } = require('../config/constants');
 
 const create = [
   body('name').trim().notEmpty().withMessage('Name is required'),
@@ -7,6 +7,8 @@ const create = [
   body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
   body('mobileNumber').trim().notEmpty().withMessage('Mobile number is required'),
   body('role').isIn(Object.values(ROLES)).withMessage('Invalid role'),
+  body('adminType').optional({ checkFalsy: true }).isIn(Object.values(ADMIN_TYPES)),
+  body('jobRole').optional().isIn(Object.values(JOB_ROLES)),
   body('permissions').optional(),
 ];
 
@@ -15,6 +17,8 @@ const update = [
   body('name').optional().trim().notEmpty().withMessage('Name cannot be empty'),
   body('mobileNumber').optional().trim().notEmpty().withMessage('Mobile number cannot be empty'),
   body('role').optional().isIn(Object.values(ROLES)).withMessage('Invalid role'),
+  body('adminType').optional({ checkFalsy: true }).isIn(Object.values(ADMIN_TYPES)),
+  body('jobRole').optional().isIn(Object.values(JOB_ROLES)),
   body('permissions').optional(),
 ];
 

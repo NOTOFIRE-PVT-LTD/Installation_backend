@@ -26,7 +26,7 @@ const getById = asyncHandler(async (req, res) => {
 });
 
 const create = asyncHandler(async (req, res) => {
-  const user = await userService.create(req.body, req.file, req.user._id);
+  const user = await userService.create(req.body, req.file, req.user);
   sendSuccess(res, { statusCode: 201, message: 'User created', data: user });
 });
 

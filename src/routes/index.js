@@ -1,6 +1,12 @@
 const express = require('express');
 const authRoutes = require('./auth.routes');
 const userRoutes = require('./user.routes');
+const peopleRoutes = require('./people.routes');
+const customerRoutes = require('./customer.routes');
+const attendanceRoutes = require('./attendance.routes');
+const leaveRoutes = require('./leave.routes');
+const visitRoutes = require('./visit.routes');
+const visitExpenseRoutes = require('./visitExpense.routes');
 const projectRoutes = require('./project.routes');
 const reportRoutes = require('./report.routes');
 const paymentRoutes = require('./payment.routes');
@@ -31,6 +37,12 @@ const router = express.Router();
 
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
+router.use('/people', peopleRoutes);
+router.use('/customers', customerRoutes);
+router.use('/attendance', attendanceRoutes);
+router.use('/leaves', leaveRoutes);
+router.use('/visits', visitRoutes);
+router.use('/visit-expenses', visitExpenseRoutes);
 router.use('/projects', projectRoutes);
 router.use('/reports', reportRoutes);
 router.use('/payments', paymentRoutes);

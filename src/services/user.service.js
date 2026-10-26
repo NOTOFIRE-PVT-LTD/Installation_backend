@@ -8,7 +8,8 @@ const uploadService = require('./upload.service');
 const tokenService = require('./token.service');
 const ApiError = require('../utils/ApiError');
 const { buildPagination, buildSort, buildPaginatedResult } = require('../utils/pagination');
-const { ROLES, USER_STATUS } = require('../config/constants');
+const { ROLES, USER_STATUS, ADMIN_TYPES, JOB_ROLES, GENDER } = require('../config/constants');
+const { isSuperAdmin, defaultAdminPermissions } = require('../utils/roles');
 
 const ALLOWED_SORT_FIELDS = ['name', 'email', 'role', 'status', 'createdAt'];
 
@@ -18,6 +19,7 @@ async function list(query) {
 
   const filter = {};
   if (query.role) filter.role = query.role;
+  if (query.jobRole) filter.jobRole = query.jobRole;
   if (query.status) filter.status = query.status;
   if (query.search) {
     const regex = new RegExp(query.search, 'i');
@@ -46,7 +48,17 @@ async function getById(id) {
   return user.toSafeObject();
 }
 
-async function create(data, file, actorId) {
+async function create(data, file, actor) {
+  const actorId = actor?._id || actor;
+  const actorDoc = actor?.role ? actor : await userRepository.findByIdWithPermissions(actorId);
+
+  if (data.role === ROLES.ADMIN) {
+    if (!isSuperAdmin(actorDoc)) throw new ApiError(403, 'Only Super Admin can create Admin accounts');
+    if (![ADMIN_TYPES.SALES_COORDINATOR, ADMIN_TYPES.TENDER_COORDINATOR].includes(data.adminType)) {
+      throw new ApiError(400, 'Admin type is required (Sales Coordinator or Tender Coordinator)');
+    }
+  }
+
   const existing = await userRepository.findOne({ email: data.email.toLowerCase() });
   if (existing) throw new ApiError(409, 'A user with this email already exists');
 
@@ -61,6 +73,9 @@ async function create(data, file, actorId) {
     password: data.password,
     mobileNumber: data.mobileNumber,
     role: data.role,
+    adminType: data.role === ROLES.ADMIN ? data.adminType : undefined,
+    jobRole: data.jobRole || (data.role === ROLES.USER ? JOB_ROLES.INSTALLER : undefined),
+    gender: Object.values(GENDER).includes(data.gender) ? data.gender : GENDER.MALE,
     profileImage,
     createdBy: actorId,
     updatedBy: actorId,
@@ -69,12 +84,14 @@ async function create(data, file, actorId) {
   if (user.role === ROLES.ADMIN || data.permissions) {
     const permission = await permissionService.createDefaultPermissions(user._id, { actorId });
     user.permissions = permission._id;
-    if (data.permissions) {
-      let parsed = data.permissions;
-      if (typeof parsed === 'string') {
-        try { parsed = JSON.parse(parsed); } catch { parsed = {}; }
-      }
-      await permissionService.updatePermissions(user._id, parsed, actorId);
+    let parsed = data.permissions;
+    if (typeof parsed === 'string') {
+      try { parsed = JSON.parse(parsed); } catch { parsed = {}; }
+    }
+    if (!parsed || typeof parsed !== 'object') parsed = {};
+    const merged = { ...defaultAdminPermissions(data.adminType), ...parsed };
+    if (Object.keys(merged).length) {
+      await permissionService.updatePermissions(user._id, merged, actorId);
     }
     await user.save();
   }
@@ -89,7 +106,7 @@ async function update(id, data, file, actorId) {
   if (!user) throw new ApiError(404, 'User not found');
 
   const updates = { updatedBy: actorId };
-  ['name', 'mobileNumber'].forEach((field) => {
+  ['name', 'mobileNumber', 'adminType', 'jobRole', 'gender'].forEach((field) => {
     if (data[field] !== undefined) updates[field] = data[field];
   });
 
@@ -220,8 +237,8 @@ async function updateOwnProfile(userId, data, file) {
 
 async function listForDropdown() {
   return userRepository.find(
-    { status: USER_STATUS.ACTIVE, role: ROLES.USER },
-    { select: 'name email mobileNumber', sort: { name: 1 } }
+    { status: USER_STATUS.ACTIVE, role: ROLES.USER, jobRole: JOB_ROLES.SALESPERSON },
+    { select: 'name email mobileNumber jobRole', sort: { name: 1 } }
   );
 }
 

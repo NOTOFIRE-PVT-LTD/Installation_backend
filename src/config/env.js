@@ -1,5 +1,7 @@
+const path = require('path');
 const dotenv = require('dotenv');
 
+dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 dotenv.config();
 
 const required = ['MONGODB_URI', 'JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET', 'COOKIE_SECRET'];
@@ -101,6 +103,8 @@ const env = {
   },
 
   resetPasswordTokenExpiresMin: Number(process.env.RESET_PASSWORD_TOKEN_EXPIRES_MIN) || 60,
+
+  visitGeofenceMeters: Number(process.env.VISIT_GEOFENCE_METERS) || 100,
 
   seedAdmin: {
     name: process.env.SEED_ADMIN_NAME || 'Super Admin',
