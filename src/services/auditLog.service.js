@@ -12,7 +12,6 @@ function escapeRegex(text) {
  */
 async function recordLog(data = {}) {
   try {
-    console.log("data", data);
     return await auditLogRepository.create({
       action: data.action,
       module: data.module || 'System',
