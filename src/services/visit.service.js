@@ -123,7 +123,11 @@ async function loadAuthorizedCustomer(customerId, actor, salespersonId) {
   const customer = await customerRepository.findById(customerId);
   if (!customer || customer.active === false) throw new ApiError(400, 'Customer not found');
   if (actor.role !== ROLES.ADMIN) {
-    if (String(customer.assignedSalesperson) !== String(actor._id)) {
+    if (
+      customer.assignedSalesperson &&
+      String(customer.assignedSalesperson) !== String(actor._id) &&
+      String(customer.createdBy) !== String(actor._id)
+    ) {
       throw new ApiError(403, 'You can only create visits for your assigned customers');
     }
   } else if (salespersonId && customer.assignedSalesperson && String(customer.assignedSalesperson) !== String(salespersonId)) {
@@ -246,6 +250,16 @@ async function proximity(id, query, actor) {
   if (!visit) throw new ApiError(404, 'Visit not found');
   assertOwnVisit(visit, actor);
   const { lat, lng } = parseCoords(query.lat, query.lng);
+  const location = resolveLocation(visit, visit.customer);
+  if (location.lat == null || location.lng == null) {
+    return decorate(visit, {
+      location: null,
+      distanceM: 0,
+      allowedRadiusMeters: geofenceMeters(),
+      withinGeofence: true,
+      isInitialSetup: true,
+    });
+  }
   const measured = measureAgainstVisit(visit, visit.customer, lat, lng);
   return decorate(visit, measured);
 }
@@ -263,12 +277,25 @@ async function checkIn(id, data, file, actor) {
   await assertSequentialStart(visit, actor);
 
   const { lat, lng } = parseCoords(data.lat, data.lng);
-  const measured = measureAgainstVisit(visit, visit.customer, lat, lng);
-  if (!measured.withinGeofence) {
-    throw new ApiError(
-      400,
-      `You are outside the allowed visit location. Move within ${measured.allowedRadiusMeters} meters of the customer to check in.`
-    );
+  const location = resolveLocation(visit, visit.customer);
+  let distanceM = 0;
+  if (location.lat == null || location.lng == null) {
+    if (visit.customer?._id) {
+      await customerRepository.updateById(visit.customer._id, {
+        locationLat: lat,
+        locationLng: lng,
+        address: data.address || visit.customer.address,
+      });
+    }
+  } else {
+    const measured = measureAgainstVisit(visit, visit.customer, lat, lng);
+    if (!measured.withinGeofence) {
+      throw new ApiError(
+        400,
+        `You are outside the allowed visit location (${Math.round(measured.distanceM)}m away). Move within ${measured.allowedRadiusMeters} meters of the customer to check in.`
+      );
+    }
+    distanceM = Math.round(measured.distanceM);
   }
 
   const photo = await uploadService.uploadImageBuffer(file.buffer);
@@ -277,7 +304,7 @@ async function checkIn(id, data, file, actor) {
     checkInAt: new Date(),
     checkInLat: lat,
     checkInLng: lng,
-    checkInDistanceM: Math.round(measured.distanceM),
+    checkInDistanceM: distanceM,
     checkInPhotoUrl: photo.url,
     checkInPhotoPublicId: photo.publicId,
     checkInAddress: String(data.address || '').trim(),
@@ -297,12 +324,17 @@ async function checkOut(id, data, file, actor) {
   assertTransition(visit.status, VISIT_STATUS.COMPLETED);
 
   const { lat, lng } = parseCoords(data.lat, data.lng);
-  const measured = measureAgainstVisit(visit, visit.customer, lat, lng);
-  if (!measured.withinGeofence) {
-    throw new ApiError(
-      400,
-      `You are outside the allowed visit location. Move within ${measured.allowedRadiusMeters} meters of the customer to check out.`
-    );
+  const location = resolveLocation(visit, visit.customer);
+  let distanceM = 0;
+  if (location.lat != null && location.lng != null) {
+    const measured = measureAgainstVisit(visit, visit.customer, lat, lng);
+    if (!measured.withinGeofence) {
+      throw new ApiError(
+        400,
+        `You are outside the allowed visit location (${Math.round(measured.distanceM)}m away). Move within ${measured.allowedRadiusMeters} meters of the customer to check out.`
+      );
+    }
+    distanceM = Math.round(measured.distanceM);
   }
 
   const remark = String(data.outcomeNotes || '').trim();
@@ -317,7 +349,7 @@ async function checkOut(id, data, file, actor) {
     checkOutAt: new Date(),
     checkOutLat: lat,
     checkOutLng: lng,
-    checkOutDistanceM: Math.round(measured.distanceM),
+    checkOutDistanceM: distanceM,
     checkOutPhotoUrl: photo.url,
     checkOutPhotoPublicId: photo.publicId,
     checkOutAddress: String(data.address || '').trim(),

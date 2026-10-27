@@ -20,7 +20,14 @@ const POPULATE = [
 
 function scopedFilter(actor) {
   if (actor.role === ROLES.ADMIN) return {};
-  return { assignedSalesperson: actor._id, active: true };
+  return {
+    $or: [
+      { assignedSalesperson: actor._id },
+      { assignedSalesperson: null },
+      { createdBy: actor._id },
+    ],
+    active: true,
+  };
 }
 
 function buildPayload(data) {
@@ -96,7 +103,12 @@ async function list(query, actor) {
 async function getById(id, actor) {
   const customer = await customerRepository.findById(id, { populate: POPULATE });
   if (!customer) throw new ApiError(404, 'Customer not found');
-  if (actor.role !== ROLES.ADMIN && String(customer.assignedSalesperson?._id || customer.assignedSalesperson) !== String(actor._id)) {
+  if (
+    actor.role !== ROLES.ADMIN &&
+    customer.assignedSalesperson &&
+    String(customer.assignedSalesperson?._id || customer.assignedSalesperson) !== String(actor._id) &&
+    String(customer.createdBy?._id || customer.createdBy) !== String(actor._id)
+  ) {
     throw new ApiError(403, 'You do not have permission to view this customer');
   }
   return customer;
@@ -104,6 +116,9 @@ async function getById(id, actor) {
 
 async function create(data, actorId) {
   const payload = buildPayload(data);
+  if (!payload.assignedSalesperson && actorId) {
+    payload.assignedSalesperson = actorId;
+  }
   await assertSalesperson(payload.assignedSalesperson);
 
   const matches = await duplicateHits(payload);
