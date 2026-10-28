@@ -2,6 +2,8 @@ const ExcelJS = require('exceljs');
 const ApiError = require('../utils/ApiError');
 const { buildPagination, buildSort, buildPaginatedResult } = require('../utils/pagination');
 const { PayflowPaymentRequest, PayflowFund, PAYMENT_REQUEST_STATUSES } = require('../models/PayflowPaymentRequest.model');
+const User = require('../models/User.model');
+const { USER_STATUS } = require('../config/constants');
 
 // status -> statuses it may move to. Processed / Rejected are terminal.
 const STATUS_TRANSITIONS = {
@@ -22,11 +24,13 @@ function escapeRegex(value) {
 
 const populateUser = { path: 'requestedBy', select: 'name email' };
 
-async function list(query) {
+// `scope.ownerId` limits results to requests submitted by that user (Payflow users).
+async function list(query, scope = {}) {
   const { page, pageSize, skip } = buildPagination(query);
   const sort = buildSort(query, SORTABLE, { srNo: -1 });
 
   const filter = {};
+  if (scope.ownerId) filter.requestedBy = scope.ownerId;
   if (query.status && PAYMENT_REQUEST_STATUSES.includes(query.status)) filter.status = query.status;
   if (query.search) {
     const regex = new RegExp(escapeRegex(query.search), 'i');
@@ -42,10 +46,18 @@ async function list(query) {
   return buildPaginatedResult({ items, total, page, pageSize });
 }
 
-async function getById(id) {
+async function getById(id, scope = {}) {
   const doc = await PayflowPaymentRequest.findById(id).populate(populateUser).populate({ path: 'history.by', select: 'name' });
   if (!doc) throw new ApiError(404, 'Payment request not found');
+  if (scope.ownerId && String(doc.requestedBy?._id || doc.requestedBy) !== String(scope.ownerId)) {
+    throw new ApiError(404, 'Payment request not found');
+  }
   return doc;
+}
+
+// Active users for the "Select user" dropdowns (price / quantity / quality check, purchase owner).
+async function userOptions() {
+  return User.find({ status: USER_STATUS.ACTIVE }).select('name email').sort({ name: 1 }).lean();
 }
 
 async function nextSrNo() {
@@ -53,24 +65,56 @@ async function nextSrNo() {
   return (last?.srNo || 0) + 1;
 }
 
+const clean = (v) => (typeof v === 'string' ? v.trim() : v);
+
+// Normalises a { user, name, email } picker value; returns undefined when nothing was chosen.
+function toPerson(value) {
+  if (!value || !(value.name || value.user)) return undefined;
+  return { user: value.user || null, name: clean(value.name) || '', email: clean(value.email) || '' };
+}
+
 async function create(body, actor) {
+  const bills = (Array.isArray(body.bills) ? body.bills : [])
+    .filter((b) => b && clean(b.billNumber) && b.billDate)
+    .map((b) => ({ billNumber: clean(b.billNumber), billDate: b.billDate }));
+  const attachments = (Array.isArray(body.attachments) ? body.attachments : [])
+    .filter((a) => a && a.url)
+    .map((a) => ({ url: a.url, publicId: a.publicId || '', name: clean(a.name) || '' }));
+
+  const totalOutstanding = Number(body.totalOutstanding) || 0;
+  const amount = Number(body.amount) || 0;
+
   const data = {
     company: body.company,
     branch: body.branch,
     vendor: body.vendor,
+    vendorAccountNumber: body.vendorAccountNumber,
+    vendorIfsc: body.vendorIfsc,
     category: body.category,
     subcategory: body.subcategory,
     itemType: body.itemType,
     description: body.description,
-    billNumber: body.billNumber,
-    billDate: body.billDate || null,
-    totalOutstanding: body.totalOutstanding,
+    bills,
+    billNumber: bills[0]?.billNumber ?? body.billNumber,
+    billDate: bills[0]?.billDate || body.billDate || null,
+    attachments,
+    totalOutstanding,
+    // Never trust a client-supplied balance.
+    balanceAmount: Math.max(totalOutstanding - amount, 0),
     payAgainst: body.payAgainst,
     bankName: body.bankName,
     paymentMode: body.paymentMode,
     amount: body.amount,
     priority: body.priority,
-    priceCheckBy: body.priceCheckBy,
+    priceCheckBy: toPerson(body.priceCheckBy),
+    quantityCheckedBy: toPerson(body.quantityCheckedBy),
+    qualityCheckedBy: toPerson(body.qualityCheckedBy),
+    purchaseOwner: toPerson(body.purchaseOwner),
+    department: body.department,
+    endUse: body.endUse,
+    lpr: body.lpr,
+    ioa: body.ioa,
+    cpp: body.cpp === '' || body.cpp == null ? undefined : Number(body.cpp),
   };
   Object.keys(data).forEach((k) => data[k] === undefined && delete data[k]);
 
@@ -251,4 +295,4 @@ async function exportWorkbook(query) {
   return wb.xlsx.writeBuffer();
 }
 
-module.exports = { list, getById, create, changeStatus, stats, addFund, exportSummary, exportWorkbook, STATUS_TRANSITIONS };
+module.exports = { list, getById, userOptions, create, changeStatus, stats, addFund, exportSummary, exportWorkbook, STATUS_TRANSITIONS };

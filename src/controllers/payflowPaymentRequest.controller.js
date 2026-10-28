@@ -2,10 +2,16 @@ const service = require('../services/payflowPaymentRequest.service');
 const asyncHandler = require('../utils/asyncHandler');
 const { sendSuccess } = require('../utils/ApiResponse');
 
+// Payflow users (non-admin) only ever see requests they submitted themselves.
+const scopeOf = (req) => (req.payflowAccess === 'user' ? { ownerId: req.user._id } : {});
+
 module.exports = {
   list: asyncHandler(async (req, res) => {
-    const result = await service.list(req.query);
+    const result = await service.list(req.query, scopeOf(req));
     sendSuccess(res, { message: 'Payment requests fetched', data: result.items, meta: result });
+  }),
+  userOptions: asyncHandler(async (req, res) => {
+    sendSuccess(res, { message: 'Users fetched', data: await service.userOptions() });
   }),
   stats: asyncHandler(async (req, res) => {
     sendSuccess(res, { message: 'Payment request stats fetched', data: await service.stats() });
@@ -24,8 +30,9 @@ module.exports = {
     res.send(Buffer.from(buffer));
   }),
   getById: asyncHandler(async (req, res) => {
-    const doc = await service.getById(req.params.id);
-    sendSuccess(res, { message: 'Payment request fetched', data: { ...doc.toObject(), allowedStatuses: service.STATUS_TRANSITIONS[doc.status] } });
+    const doc = await service.getById(req.params.id, scopeOf(req));
+    const allowedStatuses = req.payflowAccess === 'user' ? [] : service.STATUS_TRANSITIONS[doc.status];
+    sendSuccess(res, { message: 'Payment request fetched', data: { ...doc.toObject(), allowedStatuses } });
   }),
   create: asyncHandler(async (req, res) => {
     const doc = await service.create(req.body, req.user);

@@ -14,7 +14,10 @@
     "migrate:companies": "node src/scripts/migrateCompanies.js",
     "migrate:terms": "node src/scripts/migrateTerms.js",
     "migrate:proforma-invoices": "node src/scripts/migrateProformaInvoices.js",
-    "migrate:delivery-challans": "node src/scripts/migrateDeliveryChallans.js"
+    "migrate:delivery-challans": "node src/scripts/migrateDeliveryChallans.js",
+    "migrate:vendors": "node src/scripts/migrateVendors.js",
+    "migrate:categories": "node src/scripts/migrateCategories.js",
+    "migrate:subcategories": "node src/scripts/migrateSubcategories.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

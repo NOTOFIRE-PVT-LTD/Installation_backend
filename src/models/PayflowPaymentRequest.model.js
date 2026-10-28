@@ -16,6 +16,32 @@ const historySchema = new Schema(
   { _id: false }
 );
 
+const personSchema = new Schema(
+  {
+    user: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    name: { type: String, default: '', trim: true },
+    email: { type: String, default: '', trim: true },
+  },
+  { _id: false }
+);
+
+const billSchema = new Schema(
+  {
+    billNumber: { type: String, required: true, trim: true },
+    billDate: { type: Date, required: true },
+  },
+  { _id: false }
+);
+
+const attachmentSchema = new Schema(
+  {
+    url: { type: String, required: true },
+    publicId: { type: String, default: '' },
+    name: { type: String, default: '', trim: true },
+  },
+  { _id: false }
+);
+
 const paymentRequestSchema = new Schema(
   {
     srNo: { type: Number, required: true, unique: true },
@@ -23,23 +49,34 @@ const paymentRequestSchema = new Schema(
     company: { type: String, required: true, trim: true },
     branch: { type: String, required: true, trim: true },
     vendor: { type: String, required: true, trim: true, uppercase: true },
+    vendorAccountNumber: { type: String, default: '', trim: true },
+    vendorIfsc: { type: String, default: '', trim: true, uppercase: true },
     category: { type: String, required: true, trim: true },
     subcategory: { type: String, default: '', trim: true },
     itemType: { type: String, default: '', trim: true },
     description: { type: String, default: '', trim: true },
+    // billNumber / billDate mirror the first entry of `bills` (used by search + export).
     billNumber: { type: String, default: '', trim: true },
     billDate: { type: Date, default: null },
+    bills: { type: [billSchema], default: [] },
+    attachments: { type: [attachmentSchema], default: [] },
     totalOutstanding: { type: Number, default: 0, min: 0 },
+    balanceAmount: { type: Number, default: 0, min: 0 },
     payAgainst: { type: String, default: '', trim: true },
     bankName: { type: String, default: '', trim: true },
     paymentMode: { type: String, default: '', trim: true },
     amount: { type: Number, required: true, min: 0 },
     priority: { type: String, enum: PAYMENT_PRIORITIES, default: 'Medium' },
     status: { type: String, enum: PAYMENT_REQUEST_STATUSES, default: 'Pending', index: true },
-    priceCheckBy: {
-      name: { type: String, default: '', trim: true },
-      email: { type: String, default: '', trim: true },
-    },
+    priceCheckBy: { type: personSchema, default: () => ({}) },
+    quantityCheckedBy: { type: personSchema, default: () => ({}) },
+    qualityCheckedBy: { type: personSchema, default: () => ({}) },
+    purchaseOwner: { type: personSchema, default: () => ({}) },
+    department: { type: String, default: '', trim: true },
+    endUse: { type: String, default: '', trim: true },
+    lpr: { type: String, default: '', trim: true },
+    ioa: { type: String, default: '', trim: true },
+    cpp: { type: Number, default: null, min: 0 },
     requestedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     history: { type: [historySchema], default: [] },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },

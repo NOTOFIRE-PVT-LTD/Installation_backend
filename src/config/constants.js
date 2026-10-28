@@ -65,6 +65,8 @@ const PERMISSION_KEYS = Object.freeze([
   'atlantaPaymentsOwnOnly',
   'auditLogs',
   'payflow',
+  // Non-admin (User role) Payflow access: submit payment requests and view only their own.
+  'payflowUser',
 ]);
 
 const STOCK_MOVEMENT_TYPES = Object.freeze({

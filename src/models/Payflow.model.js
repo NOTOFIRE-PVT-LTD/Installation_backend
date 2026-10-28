@@ -11,9 +11,12 @@ const PayflowVendor = mongoose.model(
   'PayflowVendor',
   new Schema(
     {
+      legacySupabaseId: { type: String, default: null, trim: true, unique: true, sparse: true },
       name: { type: String, required: true, unique: true, trim: true, uppercase: true },
       accountNumber: { type: String, required: true, trim: true },
       ifscCode: { type: String, required: true, trim: true, uppercase: true },
+      status: { type: String, default: '', trim: true },
+      sourceAddedBy: { type: String, default: null },
       ...auditFields,
     },
     { timestamps: true }
@@ -24,8 +27,11 @@ const PayflowCategory = mongoose.model(
   'PayflowCategory',
   new Schema(
     {
+      legacySupabaseId: { type: String, default: null, unique: true, sparse: true, trim: true, },
       name: { type: String, required: true, unique: true, trim: true },
       description: { type: String, default: '', trim: true },
+      status: { type: String, default: 'pending', trim: true, },
+      sourceAddedBy: { type: String, default: null, },
       ...auditFields,
     },
     { timestamps: true }
@@ -36,8 +42,11 @@ const PayflowSubcategory = mongoose.model(
   'PayflowSubcategory',
   new Schema(
     {
+      legacySupabaseId: { type: String, default: null, trim: true, unique: true, sparse: true, },
       name: { type: String, required: true, unique: true, trim: true },
       description: { type: String, default: '', trim: true },
+      status: { type: String, default: 'pending', trim: true, },
+      sourceAddedBy: { type: String, default: null, },
       ...auditFields,
     },
     { timestamps: true }
