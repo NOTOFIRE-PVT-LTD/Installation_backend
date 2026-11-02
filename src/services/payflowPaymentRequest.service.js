@@ -2,6 +2,7 @@ const ExcelJS = require('exceljs');
 const ApiError = require('../utils/ApiError');
 const { buildPagination, buildSort, buildPaginatedResult } = require('../utils/pagination');
 const { PayflowPaymentRequest, PayflowFund, PAYMENT_REQUEST_STATUSES } = require('../models/PayflowPaymentRequest.model');
+const { PayflowVendor } = require('../models/Payflow.model');
 const User = require('../models/User.model');
 const { USER_STATUS } = require('../config/constants');
 
@@ -269,46 +270,155 @@ async function exportSummary(query) {
 }
 
 async function exportWorkbook(query) {
-  const rows = await PayflowPaymentRequest.find(buildExportFilter(query))
-    .sort({ srNo: 1 })
-    .populate(populateUser)
-    .lean();
+  const [rows, fundAgg] = await Promise.all([
+    PayflowPaymentRequest.find(buildExportFilter(query))
+      .sort({ srNo: 1 })
+      .populate(populateUser)
+      .lean(),
+    PayflowFund.aggregate([{ $group: { _id: null, total: { $sum: '$amount' } } }]),
+  ]);
   if (!rows.length) throw new ApiError(404, 'No payments found for the selected filters');
+
+  // Backfill accountNumber / ifscCode from PayflowVendor master if missing on the request
+  const missingVendorNames = [
+    ...new Set(
+      rows
+        .filter((r) => (!r.vendorAccountNumber || !r.vendorIfsc) && r.vendor)
+        .map((r) => r.vendor.trim().toUpperCase())
+    ),
+  ];
+  const vendorMap = new Map();
+  if (missingVendorNames.length) {
+    const vendors = await PayflowVendor.find({ name: { $in: missingVendorNames } })
+      .select('name accountNumber ifscCode')
+      .lean();
+    vendors.forEach((v) => vendorMap.set(v.name.trim().toUpperCase(), v));
+  }
+
+  const totalFund = fundAgg[0]?.total || 0;
+  const totalPayments = rows.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+  const netAvailable = totalFund - totalPayments;
 
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet('Payments');
+
   ws.columns = [
-    { header: 'SR No.', key: 'srNo', width: 9 },
-    { header: 'Date', key: 'requestDate', width: 13 },
-    { header: 'Company', key: 'company', width: 16 },
-    { header: 'Branch', key: 'branch', width: 12 },
-    { header: 'Vendor', key: 'vendor', width: 30 },
-    { header: 'Category', key: 'category', width: 22 },
-    { header: 'Subcategory', key: 'subcategory', width: 22 },
-    { header: 'Item Type', key: 'itemType', width: 16 },
-    { header: 'Description', key: 'description', width: 36 },
-    { header: 'Bill Number', key: 'billNumber', width: 18 },
-    { header: 'Bill Date', key: 'billDate', width: 13 },
-    { header: 'Pay Against', key: 'payAgainst', width: 16 },
-    { header: 'Bank Name', key: 'bankName', width: 16 },
-    { header: 'Payment Mode', key: 'paymentMode', width: 16 },
-    { header: 'Total Outstanding', key: 'totalOutstanding', width: 18 },
-    { header: 'Amount', key: 'amount', width: 16 },
-    { header: 'Priority', key: 'priority', width: 10 },
-    { header: 'Status', key: 'status', width: 12 },
-    { header: 'Requested By', key: 'requestedBy', width: 20 },
+    { key: 'srNo', width: 9 },
+    { key: 'company', width: 14 },
+    { key: 'vendor', width: 34 },
+    { key: 'accountNo', width: 22 },
+    { key: 'ifsc', width: 16 },
+    { key: 'amount', width: 14 },
+    { key: 'totalOutstanding', width: 14 },
+    { key: 'description', width: 40 },
+    { key: 'itemType', width: 16 },
+    { key: 'urgency', width: 12 },
+    { key: 'department', width: 16 },
+    { key: 'endUse', width: 16 },
+    { key: 'payAgainst', width: 16 },
+    { key: 'status', width: 12 },
+    { key: 'requestedBy', width: 18 },
+    { key: 'valueDate', width: 14 },
   ];
-  rows.forEach((r) => ws.addRow({ ...r, requestedBy: r.requestedBy?.name || '' }));
 
-  const head = ws.getRow(1);
-  head.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  head.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D3BFF' } };
-  ['requestDate', 'billDate'].forEach((k) => { ws.getColumn(k).numFmt = 'dd/mm/yyyy'; });
-  ['totalOutstanding', 'amount'].forEach((k) => { ws.getColumn(k).numFmt = '#,##0.00'; });
-  ws.views = [{ state: 'frozen', ySplit: 1 }];
+  // Rows 1-3: Top summary block
+  const r1 = ws.addRow(['Total Fund', totalFund]);
+  r1.getCell(1).font = { bold: true };
+  r1.getCell(2).numFmt = '#,##0';
 
-  const total = ws.addRow({ vendor: 'Total', amount: rows.reduce((s, r) => s + (r.amount || 0), 0) });
-  total.font = { bold: true };
+  const r2 = ws.addRow(['Total Payments', totalPayments]);
+  r2.getCell(1).font = { bold: true };
+  r2.getCell(2).numFmt = '#,##0';
+
+  const r3 = ws.addRow(['Net Available', netAvailable]);
+  r3.getCell(1).font = { bold: true };
+  r3.getCell(2).numFmt = '#,##0';
+  r3.getCell(2).font = {
+    bold: true,
+    color: { argb: netAvailable < 0 ? 'FFFF0000' : 'FF15803D' },
+  };
+
+  // Row 4: Blank row
+  ws.addRow([]);
+
+  // Row 5: Table header row
+  const headers = [
+    'SR NO',
+    'COMP',
+    'PARTY',
+    'ACCOUNTNO',
+    'IFSC',
+    'AMOUNT',
+    'Tota O/s',
+    'DESCRIPION',
+    'Item Type',
+    'Urgency',
+    'Department',
+    'End Use',
+    'Pay Agst',
+    'Status',
+    'Requested by',
+    'Value Date',
+  ];
+  const head = ws.addRow(headers);
+  head.eachCell((cell) => {
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D3BFF' } };
+  });
+
+  const formatDateDdMmYyyy = (d) => {
+    if (!d) return '';
+    const date = new Date(d);
+    if (Number.isNaN(date.getTime())) return '';
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`;
+  };
+
+  const formatPayAgainst = (val) => {
+    if (!val) return '';
+    return String(val).replace(/_/g, ' ');
+  };
+
+  const URGENCY_COLORS = {
+    High: 'FFD32F2F',
+    Medium: 'FFED6C02',
+    Low: 'FF2E7D32',
+  };
+
+  rows.forEach((r, idx) => {
+    const vLookup = r.vendor ? vendorMap.get(r.vendor.trim().toUpperCase()) : null;
+    const accountNo = r.vendorAccountNumber || vLookup?.accountNumber || '';
+    const ifsc = r.vendorIfsc || vLookup?.ifscCode || '';
+    const urgency = r.priority || 'Medium';
+
+    const row = ws.addRow({
+      srNo: idx + 1,
+      company: r.company || '',
+      vendor: r.vendor || '',
+      accountNo: accountNo ? String(accountNo) : '',
+      ifsc: ifsc ? String(ifsc) : '',
+      amount: Number(r.amount) || 0,
+      totalOutstanding: Number(r.totalOutstanding) || 0,
+      description: r.description || '',
+      itemType: r.itemType || '',
+      urgency,
+      department: r.department && r.department.trim() ? r.department.trim() : 'N/A',
+      endUse: r.endUse && r.endUse.trim() ? r.endUse.trim() : 'N/A',
+      payAgainst: formatPayAgainst(r.payAgainst),
+      status: r.status || '',
+      requestedBy: r.requestedBy?.name || 'N/A',
+      valueDate: formatDateDdMmYyyy(r.requestDate || r.createdAt),
+    });
+
+    const urgencyCell = row.getCell('urgency');
+    const urgencyBg = URGENCY_COLORS[urgency];
+    if (urgencyBg) {
+      urgencyCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: urgencyBg } };
+      urgencyCell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    }
+    urgencyCell.alignment = { horizontal: 'center' };
+  });
+
   return wb.xlsx.writeBuffer();
 }
 

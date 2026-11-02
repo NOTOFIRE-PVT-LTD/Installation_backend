@@ -19488,5 +19488,195 @@
     "publicId": "nf-site-reports/documents/payment-attachment-32405a62-85bc-4b52-b396-f653cc66e7cb.pdf",
     "resourceType": "raw",
     "bytes": 3550461
+  },
+  "bb59dfb6-86bc-4b64-ae49-83931cdb506e": {
+    "sourceId": "bb59dfb6-86bc-4b64-ae49-83931cdb506e",
+    "paymentId": "bc1f0678-e379-4a5c-b513-a80e2ef046d8",
+    "storagePath": "bc1f0678-e379-4a5c-b513-a80e2ef046d8/1793268674610.pdf",
+    "fileName": "1793101969792.pdf",
+    "url": "https://res.cloudinary.com/hstff3bq/raw/upload/v1793613539/nf-site-reports/documents/payment-attachment-bb59dfb6-86bc-4b64-ae49-83931cdb506e.pdf",
+    "publicId": "nf-site-reports/documents/payment-attachment-bb59dfb6-86bc-4b64-ae49-83931cdb506e.pdf",
+    "resourceType": "raw",
+    "bytes": 406328
+  },
+  "d7a6c788-9ea6-4e41-bdaa-3fb3d9408a08": {
+    "sourceId": "d7a6c788-9ea6-4e41-bdaa-3fb3d9408a08",
+    "paymentId": "0cb00f5f-9f5e-432c-9143-afd115fe9f2b",
+    "storagePath": "0cb00f5f-9f5e-432c-9143-afd115fe9f2b/1793270554404.pdf",
+    "fileName": "PI-PTS26073-Notofire India.pdf",
+    "url": "https://res.cloudinary.com/hstff3bq/raw/upload/v1793613541/nf-site-reports/documents/payment-attachment-d7a6c788-9ea6-4e41-bdaa-3fb3d9408a08.pdf",
+    "publicId": "nf-site-reports/documents/payment-attachment-d7a6c788-9ea6-4e41-bdaa-3fb3d9408a08.pdf",
+    "resourceType": "raw",
+    "bytes": 148490
+  },
+  "212cd100-a9db-4a69-ba84-00e939bdb137": {
+    "sourceId": "212cd100-a9db-4a69-ba84-00e939bdb137",
+    "paymentId": "9a94a46f-c3cf-46f2-a9c7-f0205e4a2451",
+    "storagePath": "9a94a46f-c3cf-46f2-a9c7-f0205e4a2451/1793270785328.pdf",
+    "fileName": "111_offer_NF_v1_271026.pdf",
+    "url": "https://res.cloudinary.com/hstff3bq/raw/upload/v1793613547/nf-site-reports/documents/payment-attachment-212cd100-a9db-4a69-ba84-00e939bdb137.pdf",
+    "publicId": "nf-site-reports/documents/payment-attachment-212cd100-a9db-4a69-ba84-00e939bdb137.pdf",
+    "resourceType": "raw",
+    "bytes": 400361
+  },
+  "de542110-826b-42c9-97d7-2047cac01567": {
+    "sourceId": "de542110-826b-42c9-97d7-2047cac01567",
+    "paymentId": "2b62f2a8-deba-45d5-be0a-6e782e957970",
+    "storagePath": "2b62f2a8-deba-45d5-be0a-6e782e957970/1793274549570.pdf",
+    "fileName": "1791626596817 (1).pdf",
+    "url": "https://res.cloudinary.com/hstff3bq/raw/upload/v1793613551/nf-site-reports/documents/payment-attachment-de542110-826b-42c9-97d7-2047cac01567.pdf",
+    "publicId": "nf-site-reports/documents/payment-attachment-de542110-826b-42c9-97d7-2047cac01567.pdf",
+    "resourceType": "raw",
+    "bytes": 923233
+  },
+  "fee7f1f6-b22a-4c0c-9d28-a244b21fe1b3": {
+    "sourceId": "fee7f1f6-b22a-4c0c-9d28-a244b21fe1b3",
+    "paymentId": "6f8b4672-22b5-4318-aedf-66bca6372748",
+    "storagePath": "6f8b4672-22b5-4318-aedf-66bca6372748/1793274724038.pdf",
+    "fileName": "1791626418432.pdf",
+    "url": "https://res.cloudinary.com/hstff3bq/raw/upload/v1793613554/nf-site-reports/documents/payment-attachment-fee7f1f6-b22a-4c0c-9d28-a244b21fe1b3.pdf",
+    "publicId": "nf-site-reports/documents/payment-attachment-fee7f1f6-b22a-4c0c-9d28-a244b21fe1b3.pdf",
+    "resourceType": "raw",
+    "bytes": 913728
+  },
+  "a9e560bc-1a63-4e00-854f-0efac11821f1": {
+    "sourceId": "a9e560bc-1a63-4e00-854f-0efac11821f1",
+    "paymentId": "5b57be4f-d1c7-49df-9fc3-a1ed87e221a9",
+    "storagePath": "5b57be4f-d1c7-49df-9fc3-a1ed87e221a9/1793274854452.pdf",
+    "fileName": "1791625894410.pdf",
+    "url": "https://res.cloudinary.com/hstff3bq/raw/upload/v1793613555/nf-site-reports/documents/payment-attachment-a9e560bc-1a63-4e00-854f-0efac11821f1.pdf",
+    "publicId": "nf-site-reports/documents/payment-attachment-a9e560bc-1a63-4e00-854f-0efac11821f1.pdf",
+    "resourceType": "raw",
+    "bytes": 714010
+  },
+  "ecc98cbc-a95d-48ea-bc16-bd8e55c6f5b9": {
+    "sourceId": "ecc98cbc-a95d-48ea-bc16-bd8e55c6f5b9",
+    "paymentId": "a1abc9d4-a2e7-4502-a965-691ce2baf623",
+    "storagePath": "a1abc9d4-a2e7-4502-a965-691ce2baf623/1793275070895.pdf",
+    "fileName": "1791280915291.pdf",
+    "url": "https://res.cloudinary.com/hstff3bq/raw/upload/v1793613559/nf-site-reports/documents/payment-attachment-ecc98cbc-a95d-48ea-bc16-bd8e55c6f5b9.pdf",
+    "publicId": "nf-site-reports/documents/payment-attachment-ecc98cbc-a95d-48ea-bc16-bd8e55c6f5b9.pdf",
+    "resourceType": "raw",
+    "bytes": 1693150
+  },
+  "41499b92-17f7-4bef-b727-948cb5c6ccbc": {
+    "sourceId": "41499b92-17f7-4bef-b727-948cb5c6ccbc",
+    "paymentId": "6f3ed29b-443e-4586-8ef0-1fcb74b9aafc",
+    "storagePath": "6f3ed29b-443e-4586-8ef0-1fcb74b9aafc/1793275593413.pdf",
+    "fileName": "1791626225865.pdf",
+    "url": "https://res.cloudinary.com/hstff3bq/raw/upload/v1793613561/nf-site-reports/documents/payment-attachment-41499b92-17f7-4bef-b727-948cb5c6ccbc.pdf",
+    "publicId": "nf-site-reports/documents/payment-attachment-41499b92-17f7-4bef-b727-948cb5c6ccbc.pdf",
+    "resourceType": "raw",
+    "bytes": 450464
+  },
+  "339880ec-a549-481e-aa99-aeb7055f3c9e": {
+    "sourceId": "339880ec-a549-481e-aa99-aeb7055f3c9e",
+    "paymentId": "9b5f6377-eeb4-4187-82c8-7e0043f94046",
+    "storagePath": "9b5f6377-eeb4-4187-82c8-7e0043f94046/1793275792121.pdf",
+    "fileName": "1791280348540.pdf",
+    "url": "https://res.cloudinary.com/hstff3bq/raw/upload/v1793613563/nf-site-reports/documents/payment-attachment-339880ec-a549-481e-aa99-aeb7055f3c9e.pdf",
+    "publicId": "nf-site-reports/documents/payment-attachment-339880ec-a549-481e-aa99-aeb7055f3c9e.pdf",
+    "resourceType": "raw",
+    "bytes": 372217
+  },
+  "c6cd8209-acce-46a7-82ca-4c689eae95ca": {
+    "sourceId": "c6cd8209-acce-46a7-82ca-4c689eae95ca",
+    "paymentId": "810509f8-ad98-4c61-9c2a-ab54e81fd1d3",
+    "storagePath": "810509f8-ad98-4c61-9c2a-ab54e81fd1d3/1793339068072.jpg",
+    "fileName": "one stop.jpg",
+    "url": "https://res.cloudinary.com/hstff3bq/image/upload/v1793613565/nf-site-reports/documents/payment-attachment-c6cd8209-acce-46a7-82ca-4c689eae95ca.jpg",
+    "publicId": "nf-site-reports/documents/payment-attachment-c6cd8209-acce-46a7-82ca-4c689eae95ca",
+    "resourceType": "image",
+    "bytes": 220733
+  },
+  "b23e8d5e-bc18-4e9f-a685-1c5fbc275c03": {
+    "sourceId": "b23e8d5e-bc18-4e9f-a685-1c5fbc275c03",
+    "paymentId": "a5327a2d-482c-45aa-b252-51a1ad996c00",
+    "storagePath": "a5327a2d-482c-45aa-b252-51a1ad996c00/1793351364121.jpeg",
+    "fileName": "optimum bill sep-26.jpeg",
+    "url": "https://res.cloudinary.com/hstff3bq/image/upload/v1793613566/nf-site-reports/documents/payment-attachment-b23e8d5e-bc18-4e9f-a685-1c5fbc275c03.jpg",
+    "publicId": "nf-site-reports/documents/payment-attachment-b23e8d5e-bc18-4e9f-a685-1c5fbc275c03",
+    "resourceType": "image",
+    "bytes": 76307
+  },
+  "dc49becf-5fe7-4c7a-a4d5-e3cd7e86fe10": {
+    "sourceId": "dc49becf-5fe7-4c7a-a4d5-e3cd7e86fe10",
+    "paymentId": "b7839622-f4e3-41d8-a080-c52a13154a58",
+    "storagePath": "b7839622-f4e3-41d8-a080-c52a13154a58/1793359078081.pdf",
+    "fileName": "DOC-20261005-WA0027(1)_3.pdf",
+    "url": "https://res.cloudinary.com/hstff3bq/raw/upload/v1793613569/nf-site-reports/documents/payment-attachment-dc49becf-5fe7-4c7a-a4d5-e3cd7e86fe10.pdf",
+    "publicId": "nf-site-reports/documents/payment-attachment-dc49becf-5fe7-4c7a-a4d5-e3cd7e86fe10.pdf",
+    "resourceType": "raw",
+    "bytes": 506363
+  },
+  "3ec00f70-e887-4227-b1de-ece341e8f59b": {
+    "sourceId": "3ec00f70-e887-4227-b1de-ece341e8f59b",
+    "paymentId": "e99b2a8d-17e6-4212-9154-8188e2abdc6c",
+    "storagePath": "e99b2a8d-17e6-4212-9154-8188e2abdc6c/1793433599940.pdf",
+    "fileName": "Sudha Enterprises.pdf",
+    "url": "https://res.cloudinary.com/hstff3bq/raw/upload/v1793613572/nf-site-reports/documents/payment-attachment-3ec00f70-e887-4227-b1de-ece341e8f59b.pdf",
+    "publicId": "nf-site-reports/documents/payment-attachment-3ec00f70-e887-4227-b1de-ece341e8f59b.pdf",
+    "resourceType": "raw",
+    "bytes": 680448
+  },
+  "f39d8d24-17cb-405d-82b5-f2db2c8cc923": {
+    "sourceId": "f39d8d24-17cb-405d-82b5-f2db2c8cc923",
+    "paymentId": "ba552c02-de39-48da-97c6-a7f8df45d260",
+    "storagePath": "ba552c02-de39-48da-97c6-a7f8df45d260/1793438268550.pdf",
+    "fileName": "SalesOrder_627205803.pdf",
+    "url": "https://res.cloudinary.com/hstff3bq/raw/upload/v1793613574/nf-site-reports/documents/payment-attachment-f39d8d24-17cb-405d-82b5-f2db2c8cc923.pdf",
+    "publicId": "nf-site-reports/documents/payment-attachment-f39d8d24-17cb-405d-82b5-f2db2c8cc923.pdf",
+    "resourceType": "raw",
+    "bytes": 98755
+  },
+  "b0b65945-1d19-43e3-923b-fa08859142a5": {
+    "sourceId": "b0b65945-1d19-43e3-923b-fa08859142a5",
+    "paymentId": "87822f0b-2d0e-47fd-8a2b-8e0f30eff38f",
+    "storagePath": "87822f0b-2d0e-47fd-8a2b-8e0f30eff38f/1793441471587.jpeg",
+    "fileName": "WhatsApp Image 2026-10-31 at 15.36.34.jpeg",
+    "url": "https://res.cloudinary.com/hstff3bq/image/upload/v1793613576/nf-site-reports/documents/payment-attachment-b0b65945-1d19-43e3-923b-fa08859142a5.jpg",
+    "publicId": "nf-site-reports/documents/payment-attachment-b0b65945-1d19-43e3-923b-fa08859142a5",
+    "resourceType": "image",
+    "bytes": 98888
+  },
+  "03cf6b79-4cbf-40af-9a07-aa32adb34f6c": {
+    "sourceId": "03cf6b79-4cbf-40af-9a07-aa32adb34f6c",
+    "paymentId": "8791930d-0114-4d5d-b37c-54dfc24e7c11",
+    "storagePath": "8791930d-0114-4d5d-b37c-54dfc24e7c11/1793442617561.jpeg",
+    "fileName": "WhatsApp Image 2026-10-31 at 15.51.03.jpeg",
+    "url": "https://res.cloudinary.com/hstff3bq/image/upload/v1793613578/nf-site-reports/documents/payment-attachment-03cf6b79-4cbf-40af-9a07-aa32adb34f6c.jpg",
+    "publicId": "nf-site-reports/documents/payment-attachment-03cf6b79-4cbf-40af-9a07-aa32adb34f6c",
+    "resourceType": "image",
+    "bytes": 119378
+  },
+  "f5d4c150-51e9-4be5-844d-f39dd034bf12": {
+    "sourceId": "f5d4c150-51e9-4be5-844d-f39dd034bf12",
+    "paymentId": "9fd33710-6302-499d-8063-2477c5b36dc3",
+    "storagePath": "9fd33710-6302-499d-8063-2477c5b36dc3/1793602335528.pdf",
+    "fileName": "PTS_PROFORMA_INVOICE.pdf",
+    "url": "https://res.cloudinary.com/hstff3bq/raw/upload/v1793613580/nf-site-reports/documents/payment-attachment-f5d4c150-51e9-4be5-844d-f39dd034bf12.pdf",
+    "publicId": "nf-site-reports/documents/payment-attachment-f5d4c150-51e9-4be5-844d-f39dd034bf12.pdf",
+    "resourceType": "raw",
+    "bytes": 205440
+  },
+  "96e67255-88af-4e94-85c0-f728985e628c": {
+    "sourceId": "96e67255-88af-4e94-85c0-f728985e628c",
+    "paymentId": "a09e1a01-67c7-4545-becd-f2c4ec3a3346",
+    "storagePath": "a09e1a01-67c7-4545-becd-f2c4ec3a3346/1793606424766.pdf",
+    "fileName": "FO_SL_26_27_2066_sales_invoice_NOTOFIRE_PRIVATE_LIMITED.pdf",
+    "url": "https://res.cloudinary.com/hstff3bq/raw/upload/v1793613582/nf-site-reports/documents/payment-attachment-96e67255-88af-4e94-85c0-f728985e628c.pdf",
+    "publicId": "nf-site-reports/documents/payment-attachment-96e67255-88af-4e94-85c0-f728985e628c.pdf",
+    "resourceType": "raw",
+    "bytes": 201398
+  },
+  "4639e742-260e-4ffe-93b5-b6127491ac8d": {
+    "sourceId": "4639e742-260e-4ffe-93b5-b6127491ac8d",
+    "paymentId": "b03af71d-52cf-4261-bc11-15edae64ebd6",
+    "storagePath": "b03af71d-52cf-4261-bc11-15edae64ebd6/1793606689205.pdf",
+    "fileName": "Notofire_Raju Choudhry_Morley (P I No 039) dt  02-11-2026.pdf",
+    "url": "https://res.cloudinary.com/hstff3bq/raw/upload/v1793613584/nf-site-reports/documents/payment-attachment-4639e742-260e-4ffe-93b5-b6127491ac8d.pdf",
+    "publicId": "nf-site-reports/documents/payment-attachment-4639e742-260e-4ffe-93b5-b6127491ac8d.pdf",
+    "resourceType": "raw",
+    "bytes": 114911
   }
 }

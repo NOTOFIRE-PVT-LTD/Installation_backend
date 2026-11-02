@@ -1,9 +1,9 @@
 {
-  "csvRecords": 1949,
-  "uploaded": 1296,
-  "alreadyUploaded": 653,
-  "linked": 1,
-  "alreadyLinked": 1948,
+  "csvRecords": 1968,
+  "uploaded": 19,
+  "alreadyUploaded": 1949,
+  "linked": 19,
+  "alreadyLinked": 1949,
   "unmatchedPayments": 0,
   "failed": 0,
   "errors": []

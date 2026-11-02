@@ -1,8 +1,8 @@
 {
-  "csvRecords": 4355,
-  "paymentGroupsMatched": 4052,
-  "billsAdded": 4351,
-  "duplicateBillsSkipped": 3,
+  "csvRecords": 4395,
+  "paymentGroupsMatched": 4090,
+  "billsAdded": 40,
+  "duplicateBillsSkipped": 4354,
   "unmatchedBills": 0,
   "invalidBills": 1,
   "failedBatches": 0,
