@@ -59,7 +59,7 @@ const paymentReceivedSchema = new Schema(
 
 const atlantaPaymentSchema = new Schema(
   {
-    legacySupabaseId: { type: String, default: null, trim: true },
+    legacySupabaseId: { type: String, trim: true },
     fileName: { type: String, required: true, trim: true },
     consigneeName: { type: String, default: '', trim: true },
     crnDate: { type: Date, default: null },
@@ -107,7 +107,12 @@ atlantaPaymentSchema.index({ createdAt: -1 });
 atlantaPaymentSchema.index({ fileName: 1 });
 atlantaPaymentSchema.index(
   { legacySupabaseId: 1 },
-  { unique: true, sparse: true }
+  {
+    unique: true,
+    partialFilterExpression: {
+      legacySupabaseId: { $type: 'string' },
+    },
+  }
 );
 
 module.exports = mongoose.model('AtlantaPayment', atlantaPaymentSchema);

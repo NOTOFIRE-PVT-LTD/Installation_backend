@@ -27,6 +27,7 @@ const deliveryChallanRoutes = require('./deliveryChallan.routes');
 const atlantaPaymentRoutes = require('./atlantaPayment.routes');
 const auditLogRoutes = require('./auditLog.routes');
 const payflowRoutes = require('./payflow.routes');
+const salesTravelRequestRoutes = require('./salesTravelRequest.routes');
 
 const router = express.Router();
 
@@ -58,5 +59,6 @@ router.use('/delivery-challans', deliveryChallanRoutes);
 router.use('/atlanta-payments', atlantaPaymentRoutes);
 router.use('/audit-logs', auditLogRoutes);
 router.use('/payflow', payflowRoutes);
+router.use('/sales-travel-requests', salesTravelRequestRoutes);
 
 module.exports = router;

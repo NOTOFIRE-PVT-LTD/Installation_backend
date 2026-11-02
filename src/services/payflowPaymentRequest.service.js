@@ -47,11 +47,28 @@ async function list(query, scope = {}) {
 }
 
 async function getById(id, scope = {}) {
-  const doc = await PayflowPaymentRequest.findById(id).populate(populateUser).populate({ path: 'history.by', select: 'name' });
-  if (!doc) throw new ApiError(404, 'Payment request not found');
-  if (scope.ownerId && String(doc.requestedBy?._id || doc.requestedBy) !== String(scope.ownerId)) {
+  const doc = await PayflowPaymentRequest.findById(id)
+    .populate(populateUser)
+    .populate('quantityCheckedBy.user', 'name email')
+    .populate('qualityCheckedBy.user', 'name email')
+    .populate('purchaseOwner.user', 'name email')
+    .populate('priceCheckBy.user', 'name email')
+    .populate({
+      path: 'history.by',
+      select: 'name'
+    });
+
+  if (!doc) {
     throw new ApiError(404, 'Payment request not found');
   }
+
+  if (
+    scope.ownerId &&
+    String(doc.requestedBy?._id || doc.requestedBy) !== String(scope.ownerId)
+  ) {
+    throw new ApiError(404, 'Payment request not found');
+  }
+
   return doc;
 }
 

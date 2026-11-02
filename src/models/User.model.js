@@ -6,6 +6,15 @@ const { Schema } = mongoose;
 
 const userSchema = new Schema(
   {
+    legacySupabaseId: {
+      type: String,
+      trim: true,
+    },
+    company: {
+      type: String,
+      default: '',
+      trim: true,
+    },
     name: { type: String, required: true, trim: true },
     email: {
       type: String,
@@ -14,8 +23,18 @@ const userSchema = new Schema(
       lowercase: true,
       trim: true,
     },
-    password: { type: String, required: true, select: false },
-    mobileNumber: { type: String, required: true, trim: true },
+    password: {
+      type: String,
+      required: function () {
+        return !this.legacySupabaseId;
+      },
+      select: false,
+    },
+    mobileNumber: {
+      type: String,
+      default: '',
+      trim: true,
+    },
     profileImage: {
       url: { type: String, default: null },
       publicId: { type: String, default: null },
@@ -33,6 +52,15 @@ const userSchema = new Schema(
 );
 
 userSchema.index({ role: 1, status: 1 });
+userSchema.index(
+  { legacySupabaseId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      legacySupabaseId: { $type: 'string' },
+    },
+  }
+);
 
 userSchema.pre('save', async function preSave(next) {
   if (!this.isModified('password')) return next();

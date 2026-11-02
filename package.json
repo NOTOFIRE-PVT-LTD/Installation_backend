@@ -17,9 +17,16 @@
     "migrate:delivery-challans": "node src/scripts/migrateDeliveryChallans.js",
     "migrate:vendors": "node src/scripts/migrateVendors.js",
     "migrate:categories": "node src/scripts/migrateCategories.js",
-    "migrate:subcategories": "node src/scripts/migrateSubcategories.js"
+    "migrate:subcategories": "node src/scripts/migrateSubcategories.js",
+    "migrate:companiespayflow": "node src/scripts/migrateCompaniespayflow.js",
+    "migrate:branches": "node src/scripts/migrateBranches.js",
+    "migrate:payflowpayments": "node src/scripts/migratePayflowPayments.js",
+    "migrate:payflowbills": "node src/scripts/migratePayflowBills.js",
+    "migrate:payflowattachments": "node src/scripts/migratePayflowAttachments.js",
+    "migrate:users": "node src/scripts/migrateSupabaseUsers.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.118.0",
     "bcryptjs": "^2.4.3",
     "cloudinary": "^2.5.1",
     "cookie-parser": "^1.4.7",

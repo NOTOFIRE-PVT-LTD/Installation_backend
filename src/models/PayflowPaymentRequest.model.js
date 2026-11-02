@@ -44,14 +44,15 @@ const attachmentSchema = new Schema(
 
 const paymentRequestSchema = new Schema(
   {
+    legacySupabaseId: { type: String, default: null, trim: true },
     srNo: { type: Number, required: true, unique: true },
     requestDate: { type: Date, default: Date.now },
     company: { type: String, required: true, trim: true },
-    branch: { type: String, required: true, trim: true },
+    branch: { type: String, trim: true },
     vendor: { type: String, required: true, trim: true, uppercase: true },
     vendorAccountNumber: { type: String, default: '', trim: true },
     vendorIfsc: { type: String, default: '', trim: true, uppercase: true },
-    category: { type: String, required: true, trim: true },
+    category: { type: String, default: '', },
     subcategory: { type: String, default: '', trim: true },
     itemType: { type: String, default: '', trim: true },
     description: { type: String, default: '', trim: true },
@@ -61,7 +62,7 @@ const paymentRequestSchema = new Schema(
     bills: { type: [billSchema], default: [] },
     attachments: { type: [attachmentSchema], default: [] },
     totalOutstanding: { type: Number, default: 0, min: 0 },
-    balanceAmount: { type: Number, default: 0, min: 0 },
+    balanceAmount: { type: Number, default: 0 },
     payAgainst: { type: String, default: '', trim: true },
     bankName: { type: String, default: '', trim: true },
     paymentMode: { type: String, default: '', trim: true },
@@ -77,16 +78,26 @@ const paymentRequestSchema = new Schema(
     lpr: { type: String, default: '', trim: true },
     ioa: { type: String, default: '', trim: true },
     cpp: { type: Number, default: null, min: 0 },
-    requestedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    requestedBy: { type: Schema.Types.ObjectId, ref: 'User' },
     history: { type: [historySchema], default: [] },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     updatedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    legacyData: { type: Schema.Types.Mixed, default: () => ({}), },
   },
   { timestamps: true }
 );
 
 paymentRequestSchema.index({ vendor: 1 });
 paymentRequestSchema.index({ requestDate: -1 });
+paymentRequestSchema.index(
+  { legacySupabaseId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      legacySupabaseId: { $type: 'string' },
+    },
+  }
+);
 
 const PayflowPaymentRequest = mongoose.model('PayflowPaymentRequest', paymentRequestSchema);
 

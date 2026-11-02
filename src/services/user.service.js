@@ -55,7 +55,7 @@ async function create(data, file, actorId) {
     profileImage = await uploadService.uploadImageBuffer(file.buffer);
   }
 
-  const user = await userRepository.create({
+  const userPayload = {
     name: data.name,
     email: data.email,
     password: data.password,
@@ -64,7 +64,27 @@ async function create(data, file, actorId) {
     profileImage,
     createdBy: actorId,
     updatedBy: actorId,
-  });
+  };
+  let user;
+  try {
+    user = await userRepository.create(userPayload);
+  } catch (err) {
+    if (err?.code === 11000 && String(err?.message || '').includes('legacySupabaseId')) {
+      await userRepository.model.collection.updateMany(
+        { legacySupabaseId: null },
+        { $unset: { legacySupabaseId: '' } }
+      );
+      try {
+        await userRepository.model.collection.dropIndex('legacySupabaseId_1');
+      } catch {
+        // ignore if already dropped
+      }
+      await userRepository.model.syncIndexes();
+      user = await userRepository.create(userPayload);
+    } else {
+      throw err;
+    }
+  }
 
   if (user.role === ROLES.ADMIN || data.permissions) {
     const permission = await permissionService.createDefaultPermissions(user._id, { actorId });

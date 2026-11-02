@@ -11,7 +11,7 @@ const PayflowVendor = mongoose.model(
   'PayflowVendor',
   new Schema(
     {
-      legacySupabaseId: { type: String, default: null, trim: true, unique: true, sparse: true },
+      legacySupabaseId: { type: String, trim: true, unique: true, sparse: true },
       name: { type: String, required: true, unique: true, trim: true, uppercase: true },
       accountNumber: { type: String, required: true, trim: true },
       ifscCode: { type: String, required: true, trim: true, uppercase: true },
@@ -27,7 +27,7 @@ const PayflowCategory = mongoose.model(
   'PayflowCategory',
   new Schema(
     {
-      legacySupabaseId: { type: String, default: null, unique: true, sparse: true, trim: true, },
+      legacySupabaseId: { type: String, unique: true, sparse: true, trim: true },
       name: { type: String, required: true, unique: true, trim: true },
       description: { type: String, default: '', trim: true },
       status: { type: String, default: 'pending', trim: true, },
@@ -42,7 +42,7 @@ const PayflowSubcategory = mongoose.model(
   'PayflowSubcategory',
   new Schema(
     {
-      legacySupabaseId: { type: String, default: null, trim: true, unique: true, sparse: true, },
+      legacySupabaseId: { type: String, trim: true, unique: true, sparse: true },
       name: { type: String, required: true, unique: true, trim: true },
       description: { type: String, default: '', trim: true },
       status: { type: String, default: 'pending', trim: true, },
@@ -57,6 +57,7 @@ const PayflowCompany = mongoose.model(
   'PayflowCompany',
   new Schema(
     {
+      legacySupabaseId: { type: String, trim: true, unique: true, sparse: true },
       name: { type: String, required: true, unique: true, trim: true },
       code: { type: String, required: true, unique: true, trim: true, uppercase: true },
       ...auditFields,
@@ -69,6 +70,7 @@ const PayflowBranch = mongoose.model(
   'PayflowBranch',
   new Schema(
     {
+      legacySupabaseId: { type: String, trim: true, unique: true, sparse: true },
       name: { type: String, required: true, unique: true, trim: true },
       code: { type: String, required: true, unique: true, trim: true, uppercase: true },
       ...auditFields,

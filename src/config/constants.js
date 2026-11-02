@@ -67,6 +67,9 @@ const PERMISSION_KEYS = Object.freeze([
   'payflow',
   // Non-admin (User role) Payflow access: submit payment requests and view only their own.
   'payflowUser',
+  'salesTravelRequests',
+  // Restricts a Sales Travel Request user to their own requests only.
+  'salesTravelRequestsOwnOnly',
 ]);
 
 const STOCK_MOVEMENT_TYPES = Object.freeze({

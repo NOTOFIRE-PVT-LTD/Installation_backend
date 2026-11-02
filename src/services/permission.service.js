@@ -1,8 +1,17 @@
 const permissionRepository = require('../repositories/permission.repository');
 const { PERMISSION_KEYS, ROLES } = require('../config/constants');
 
-const DEFAULT_INSTALLER_MODULES = ['projects', 'reports', 'cadDrawing'];
-const INSTALLER_PERMISSION_KEYS = ['projects', 'reports', 'cadDrawing', 'atlantaPayments', 'atlantaPaymentsOwnOnly', 'payflowUser'];
+const DEFAULT_INSTALLER_MODULES = ['projects', 'reports', 'cadDrawing', 'salesTravelRequests'];
+const INSTALLER_PERMISSION_KEYS = [
+  'projects',
+  'reports',
+  'cadDrawing',
+  'atlantaPayments',
+  'atlantaPaymentsOwnOnly',
+  'payflowUser',
+  'salesTravelRequests',
+  'salesTravelRequestsOwnOnly',
+];
 
 function serializePermissions(user) {
   if (user.role === ROLES.ADMIN) {

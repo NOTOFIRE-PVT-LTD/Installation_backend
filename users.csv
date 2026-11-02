@@ -1,0 +1,39 @@
+id,email,name,role,company,created_at,status,updated_at
+aeb7e654-cfe2-454c-aeb2-34fa47ece4df,admin@example.com,Admin User,admin,ACME Inc,2025-04-28 15:16:16.119789+00,active,2025-06-17 08:17:27.264669+00
+406db631-bc67-4eaa-92c0-6af26c1a931a,accounts@example.com,Accounts,accounts,ACME Inc,2025-04-28 15:15:05.937994+00,active,2025-06-17 08:17:27.264669+00
+321b976b-251b-492a-8213-66579ba630f8,becky@example.com,Beck,user,ACME Inc,2025-06-07 14:17:18.649321+00,active,2025-06-17 08:17:27.264669+00
+6b66d589-17a0-4f76-9154-91c8116754fa,gauravjain@atlantatelecables.com,Gaurav Jain,admin,Atlanta Telecables,2025-06-07 14:42:25.300023+00,active,2025-06-17 08:17:27.264669+00
+5aaa2af6-7c64-49af-9f71-1dbe695b445d,ashoksingh@atlantatelecables.com,Ashok Singh,user,Atlanta Telecables,2025-06-07 15:05:34.615988+00,active,2025-06-17 08:17:27.264669+00
+6bf83928-36ed-4d6e-93c4-203ad3702e5f,adityasingh@atlantatelecables.com,Aditya Singh,user,Atlanta Telecables,2025-06-07 15:06:33.325728+00,active,2025-06-17 08:17:27.264669+00
+238b8a9a-eb4b-441f-9019-3c75062434f0,janvijain@atlantatelecables.com,Janvi Jain,user,Atlanta Telecables,2025-06-07 15:09:30.434182+00,active,2025-06-17 08:17:27.264669+00
+c0c02636-3563-4d0b-80d0-2ba69b56ba24,mohithr@atlantatelecables.com,Mohit HR,user,Atlanta Telecables,2025-06-07 15:12:35.636067+00,active,2025-06-17 08:17:27.264669+00
+15f3619d-8726-4c99-bd58-e30c2e2a495d,mohitrnd@atlantatelecables.com,Mohit RND,user,Atlanta Telecables,2025-06-07 15:13:52.079476+00,active,2025-06-17 08:17:27.264669+00
+d38fb3ab-4094-4c13-9fd3-bf75a1bf5057,monikajain@atlantatelecables.com,Monika Jain,user,Atlanta Telecables,2025-06-07 15:14:57.125098+00,active,2025-06-17 08:17:27.264669+00
+72832721-3985-44b5-96a9-775e7557cf0b,prakuljain@atlantatelecables.com,Prakul Jain,user,Atlanta Telecables,2025-06-07 15:16:10.115006+00,active,2025-06-17 08:17:27.264669+00
+7cd360a6-f3cb-43c4-9455-e5a0a42bb611,rajivshukla@atlantatelecables.com,Rajiv Shukla,user,Atlanta Telecables,2025-06-07 15:17:13.45969+00,active,2025-06-17 08:17:27.264669+00
+68a22530-c78b-448c-9d66-9dc784e62fdc,rajuratan@atlantatelecables.com,Raju Ratan,user,Atlanta Telecables,2025-06-07 15:18:15.630874+00,active,2025-06-17 08:17:27.264669+00
+4aa20409-317d-4e14-9f0d-64be6bebf3cb,rakeshrnd@atlantatelecables.com,Rakesh RND,user,Atlanta Telecables,2025-06-07 15:19:28.212598+00,active,2025-06-17 08:17:27.264669+00
+79eed880-3936-49a8-b4b2-676027d51f3c,sahilhasija@atlantatelecables.com,Sahil Hasija,user,Atlanta Telecables,2025-06-07 15:20:32.932559+00,active,2025-06-17 08:17:27.264669+00
+c426ae49-9392-4341-aa25-b110e1540781,tarunjain@atlantatelecables.com,Tarun Jain,user,Atlanta Telecables,2025-06-07 15:23:48.521473+00,active,2025-06-17 08:17:27.264669+00
+a7380c6a-cf58-4730-a266-c6d4846d36f6,jatingupta@atlantatelecables.com,Jatin Gupta,user,Atlanta Telecables,2025-06-07 15:26:27.24304+00,active,2025-06-17 08:17:27.264669+00
+72ae6703-59c6-4ddb-a81e-f8d3acf206ad,dayarnd@atlantatelecables.com,Daya RND,user,Atlanta Telecables,2025-06-07 15:08:03.462218+00,active,2025-06-17 08:17:27.264669+00
+8165c2d9-7188-4663-8a09-8b45ed201fcc,employee@example.com,Alex,user,ACME Inc,2025-04-28 15:28:02.392171+00,active,2025-06-17 08:20:25.433198+00
+840a5ace-7ecb-45d8-8f58-7784666b22f9,test@abc.com,TEST,user,abc,2025-06-17 08:34:05.329+00,active,2025-06-17 08:34:30.293448+00
+26834aac-bbae-45bf-bd30-5c4be7675479,Kaushik@example.com,Kaushik,user,abc,2025-07-28 05:07:24.121+00,active,2025-07-28 05:07:22.920109+00
+de286471-b4f9-4b94-b740-4237f637086b,Vipin@example.com,Vipin,accounts,abc,2025-07-28 05:06:29.21+00,inactive,2025-07-28 05:08:09.740782+00
+ae66bea3-6692-45f0-8d26-64e7bc148aa9,Vipin@atlantatelecables.com,Vipin,user,abc,2025-07-28 05:09:00.457+00,active,2025-07-28 05:08:59.285934+00
+4e2dfdc7-951a-46d2-bafe-68bbbfba3473,Kishore@atlantatelecables.com,Kishore,user,abc,2025-07-28 05:16:15.61+00,active,2025-07-28 05:16:14.429456+00
+1483dfe7-2c60-4a51-8601-5f9a84238241,hrnotofire@example.com,HRNOTOFIRE,user,abc,2025-08-12 13:04:40.157+00,active,2025-08-12 13:04:41.009792+00
+12df26e0-3728-4d0a-825a-77bb78e0dd77,Psaini@atlantatelecables.com,Pradeep Saini,user,abc,2025-08-19 09:15:27.72+00,active,2025-08-19 09:15:27.730699+00
+c0476504-c996-46d9-b9db-727eb5020f91,Tarun@atlantatelecables.com,TARUN,user,abc,2025-08-23 09:05:06.718+00,active,2025-08-23 09:05:06.769141+00
+3e87df44-f70c-4f75-b0e9-0ec935c8d9cb,Avanish@atlantatelecables.com,Avanish,user,abc,2025-08-23 09:07:04.412+00,active,2025-08-23 09:07:04.41019+00
+f368119d-96f3-4517-b41c-f9c437d76f3d,mahip@atlantatelecables.com,Mahip,user,abc,2025-08-26 10:49:19.695+00,active,2025-08-26 10:49:19.714225+00
+6b88bdce-c86d-4a36-b810-24bda4279d51,Praveen@atlantatelecables.com,Praveen Jain,user,abc,2025-09-03 11:32:53.177+00,active,2025-09-03 11:32:52.806718+00
+f9fedbea-c46b-484c-b4d1-7ad42860ff00,UKHRATCL@GMAIL.COM,UKHR,user,abc,2026-01-27 11:45:29.514+00,active,2026-01-27 11:45:29.243999+00
+ed00cf1e-7b28-40a5-824a-ca6fe81cd49b,amitnotofire@gmail.com,Amit,user,abc,2026-01-28 06:14:02.316+00,active,2026-01-28 06:14:02.332607+00
+ddb29389-a7c7-41dd-a99f-94736a85b096,mukeshgupta@gmail.com,Mukesh Gupta,user,abc,2026-06-13 05:52:05.411+00,active,2026-06-13 05:52:05.517384+00
+9cbeba3c-e17e-4d27-8b94-20c0b4b0b038,accounts@atlantatelecables.com,Accounts,admin,Atlanta Telecables,2025-06-07 14:30:05.608846+00,active,2026-08-03 06:53:59.848988+00
+73223879-5706-4e26-bc4e-89e696cdb4c6,radhaatlantatelecables@gmail.com,Radha,user,abc,2026-08-31 11:23:29.48+00,active,2026-08-31 11:23:29.570732+00
+be22815b-5375-4e6b-8574-f21b906cf9e6,Vishal@atlantatelecables.com,Vishal,user,abc,2026-09-16 08:23:49.855+00,active,2026-09-16 08:23:49.789681+00
+6f51a5c0-669a-4cf2-b962-b0b35f829f4c,Keshav@atlantatelecables.com,Keshav,user,abc,2026-09-16 09:34:04.998+00,active,2026-09-16 09:34:04.878336+00
+c8d3ff92-afc9-4869-a188-924046ea59e3,Harshit@atlantatelecables.com,Harshit,user,abc,2026-09-18 10:54:34.461+00,active,2026-09-18 10:54:34.70427+00

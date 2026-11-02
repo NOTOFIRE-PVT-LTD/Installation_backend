@@ -1,0 +1,17 @@
+{
+  "csvRecords": 4355,
+  "paymentGroupsMatched": 4052,
+  "billsAdded": 4351,
+  "duplicateBillsSkipped": 3,
+  "unmatchedBills": 0,
+  "invalidBills": 1,
+  "failedBatches": 0,
+  "errors": [
+    {
+      "row": 3204,
+      "billId": "c250b214-a3d6-4856-8ec8-b42d8bfa16f0",
+      "paymentId": "a79311f8-2f9c-49ed-b67f-50e26dfc866d",
+      "error": "Invalid bill date: 0026-06-24 00:00:00+00"
+    }
+  ]
+}

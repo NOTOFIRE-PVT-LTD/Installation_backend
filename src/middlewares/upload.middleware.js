@@ -23,6 +23,7 @@ const MIXED_FIELDS = [
   'productDatasheet',
   'dcAttachments',
   'atlantaProofs',
+  'salesTravelProofs',
 ];
 const MIXED_MIME_TYPES = [...IMAGE_MIME_TYPES, ...DOCUMENT_MIME_TYPES];
 
@@ -127,8 +128,10 @@ const uploadQuotationProductFiles = upload.fields([
 
 const uploadDeliveryChallanFiles = upload.array('dcAttachments', 10);
 const uploadAtlantaPaymentProofs = upload.array('atlantaProofs', 50);
+const uploadSalesTravelProofs = upload.array('salesTravelProofs', 50);
 
 module.exports = {
+  uploadSalesTravelProofs,
   uploadAtlantaPaymentProofs,
   uploadQuotationProductFiles,
   uploadDeliveryChallanFiles,
