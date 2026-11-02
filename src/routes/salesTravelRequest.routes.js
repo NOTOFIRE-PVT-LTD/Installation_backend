@@ -10,13 +10,7 @@ const router = express.Router();
 const requireSalesTravelAccess = (req, _res, next) => {
   if (!req.user) return next(new ApiError(401, 'Authentication required'));
   const permissions = req.user.permissions;
-  if (req.user.role === ROLES.ADMIN) {
-    if (permissions && permissions.salesTravelRequests === false) {
-      return next(new ApiError(403, 'You do not have permission to access Sales Travel Requests'));
-    }
-    return next();
-  }
-  if (permissions && permissions.salesTravelRequests === false) {
+  if (!permissions || !permissions.salesTravelRequests) {
     return next(new ApiError(403, 'You do not have permission to access Sales Travel Requests'));
   }
   next();

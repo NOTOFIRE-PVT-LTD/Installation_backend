@@ -192,10 +192,9 @@ async function updatePermissions(id, updates, actorId) {
   if (!user) throw new ApiError(404, 'User not found');
 
   const keys = user.role === ROLES.ADMIN ? undefined : permissionService.INSTALLER_PERMISSION_KEYS;
-  await permissionService.updatePermissions(id, updates, actorId, keys);
+  const permission = await permissionService.updatePermissions(id, updates, actorId, keys);
 
-  if (user.role !== ROLES.ADMIN && !user.permissions) {
-    const permission = await permissionRepository.findByUser(id);
+  if (!user.permissions && permission?._id) {
     await userRepository.updateById(id, { permissions: permission._id });
   }
 
