@@ -32,9 +32,13 @@ const proformaInvoiceRoutes = require('./proformaInvoice.routes');
 const deliveryChallanRoutes = require('./deliveryChallan.routes');
 const atlantaPaymentRoutes = require('./atlantaPayment.routes');
 const auditLogRoutes = require('./auditLog.routes');
+const complaintRoutes = require('./complaint.routes');
+const companionRoutes = require('./companion.routes');
+const centralRoutes = require('./central.routes');
 
 const router = express.Router();
 
+router.use('/central', centralRoutes);
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
 router.use('/people', peopleRoutes);
@@ -68,5 +72,7 @@ router.use('/proforma-invoices', proformaInvoiceRoutes);
 router.use('/delivery-challans', deliveryChallanRoutes);
 router.use('/atlanta-payments', atlantaPaymentRoutes);
 router.use('/audit-logs', auditLogRoutes);
+router.use('/complaints', complaintRoutes);
+router.use('/companion', companionRoutes);
 
 module.exports = router;

@@ -88,11 +88,11 @@ const env = {
   },
 
   smtp: {
-    host: process.env.SMTP_HOST,
+    host: process.env.SMTP_HOST ? String(process.env.SMTP_HOST).trim() : 'smtp.gmail.com',
     port: Number(process.env.SMTP_PORT) || 587,
     secure: process.env.SMTP_SECURE === 'true',
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
+    user: process.env.SMTP_USER ? String(process.env.SMTP_USER).trim() : '',
+    pass: process.env.SMTP_PASS ? String(process.env.SMTP_PASS).replace(/\s+/g, '') : '',
     fromName: process.env.SMTP_FROM_NAME || 'NF Site Installation Report',
     fromEmail: process.env.SMTP_FROM_EMAIL || 'no-reply@nfsite.com',
   },
@@ -126,6 +126,21 @@ const env = {
     mediaSource: process.env.AISENSY_MEDIA_SOURCE || 'station',
     mediaUrl: process.env.AISENSY_MEDIA_URL || '',
     mediaFilename: process.env.AISENSY_MEDIA_FILENAME || 'notification.pdf',
+    // Complaint customer templates (set when AISensy campaigns are approved)
+    complaintCreatedCampaign: process.env.AISENSY_COMPLAINT_CREATED_CAMPAIGN || '',
+    complaintCreatedTemplate: process.env.AISENSY_COMPLAINT_CREATED_TEMPLATE || '',
+    complaintResolvedCampaign: process.env.AISENSY_COMPLAINT_RESOLVED_CAMPAIGN || '',
+    complaintResolvedTemplate: process.env.AISENSY_COMPLAINT_RESOLVED_TEMPLATE || '',
+    complaintAssignedCampaign: process.env.AISENSY_COMPLAINT_ASSIGNED_CAMPAIGN || '',
+    complaintAssignedTemplate: process.env.AISENSY_COMPLAINT_ASSIGNED_TEMPLATE || '',
+  },
+
+  sms: {
+    enabled: process.env.SMS_ENABLED === 'true',
+    authKey: process.env.SMS_AUTH_KEY || '',
+    senderId: process.env.SMS_SENDER_ID || '',
+    templateId: process.env.SMS_TEMPLATE_ID || '',
+    apiUrl: process.env.SMS_API_URL || '',
   },
 };
 

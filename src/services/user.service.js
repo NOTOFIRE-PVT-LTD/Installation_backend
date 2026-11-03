@@ -8,8 +8,18 @@ const uploadService = require('./upload.service');
 const tokenService = require('./token.service');
 const ApiError = require('../utils/ApiError');
 const { buildPagination, buildSort, buildPaginatedResult } = require('../utils/pagination');
-const { ROLES, USER_STATUS, ADMIN_TYPES, JOB_ROLES, GENDER } = require('../config/constants');
-const { isSuperAdmin, defaultAdminPermissions } = require('../utils/roles');
+const { rejectIfPasswordReused } = require('../utils/passwordReuse');
+const { ROLES, USER_STATUS, ADMIN_TYPES, JOB_ROLES, GENDER, PERMISSION_KEYS } = require('../config/constants');
+const {
+  isSuperAdmin,
+  isLockedSuperAdmin,
+  isPlatformOwner,
+  canSetPassword,
+  actorHasApp,
+  defaultUserPermissions,
+  adminTypeForApp,
+  permissionsForApp,
+} = require('../utils/roles');
 
 const ALLOWED_SORT_FIELDS = ['name', 'email', 'role', 'status', 'createdAt'];
 
@@ -18,12 +28,71 @@ async function list(query) {
   const sort = buildSort(query, ALLOWED_SORT_FIELDS);
 
   const filter = {};
-  if (query.role) filter.role = query.role;
+  if (query.role === ADMIN_TYPES.SUPER_ADMIN || query.adminType === ADMIN_TYPES.SUPER_ADMIN) {
+    filter.role = ROLES.ADMIN;
+    filter.adminType = ADMIN_TYPES.SUPER_ADMIN;
+  } else if (query.role) {
+    filter.role = query.role;
+    if (query.role === ROLES.ADMIN) {
+      filter.adminType = { $ne: ADMIN_TYPES.SUPER_ADMIN };
+    }
+  }
+  if (query.adminType && query.adminType !== ADMIN_TYPES.SUPER_ADMIN) filter.adminType = query.adminType;
   if (query.jobRole) filter.jobRole = query.jobRole;
   if (query.status) filter.status = query.status;
-  if (query.search) {
-    const regex = new RegExp(query.search, 'i');
-    filter.$or = [{ name: regex }, { email: regex }, { mobileNumber: regex }];
+
+  const searchOr = query.search
+    ? [
+        { name: new RegExp(query.search, 'i') },
+        { email: new RegExp(query.search, 'i') },
+        { mobileNumber: new RegExp(query.search, 'i') },
+      ]
+    : null;
+
+  if (query.scope === 'attendance' || query.scope === 'tracking') {
+    delete filter.role;
+    delete filter.jobRole;
+    delete filter.adminType;
+    const scopeOr = [
+      { role: ROLES.USER, jobRole: JOB_ROLES.SALESPERSON },
+      { role: ROLES.ADMIN, adminType: ADMIN_TYPES.SALES_COORDINATOR },
+    ];
+    if (searchOr) {
+      filter.$and = [{ $or: scopeOr }, { $or: searchOr }];
+    } else {
+      filter.$or = scopeOr;
+    }
+  } else if (searchOr) {
+    filter.$or = searchOr;
+  }
+
+  if (query.apps) {
+    const keys = String(query.apps)
+      .split(',')
+      .map((key) => key.trim())
+      .filter((key) => PERMISSION_KEYS.includes(key));
+    if (keys.length) {
+      const permOr = keys.map((key) => ({ [key]: true }));
+      if (keys.includes('attendance')) permOr.push({ salespersonTracking: true });
+      const permDocs = await permissionRepository.find({ $or: permOr }, { select: 'user' });
+      const userIds = permDocs.map((doc) => doc.user).filter(Boolean);
+      const appsOr = [{ _id: { $in: userIds } }, { adminType: ADMIN_TYPES.SUPER_ADMIN }];
+      if (keys.includes('complaints')) appsOr.push({ adminType: ADMIN_TYPES.COMPLAINT_COORDINATOR });
+      if (keys.includes('attendance')) {
+        appsOr.push({ jobRole: JOB_ROLES.SALESPERSON });
+        appsOr.push({ adminType: ADMIN_TYPES.SALES_COORDINATOR });
+      }
+      if (keys.includes('tenders')) appsOr.push({ adminType: ADMIN_TYPES.TENDER_COORDINATOR });
+      const appsClause = { $or: appsOr };
+      if (filter.$and) {
+        filter.$and.push(appsClause);
+      } else if (filter.$or) {
+        filter.$and = [{ $or: filter.$or }, appsClause];
+        delete filter.$or;
+      } else {
+        filter.$or = appsOr;
+      }
+    }
   }
 
   const { items, total } = await userRepository.paginate({
@@ -51,11 +120,54 @@ async function getById(id) {
 async function create(data, file, actor) {
   const actorId = actor?._id || actor;
   const actorDoc = actor?.role ? actor : await userRepository.findByIdWithPermissions(actorId);
+  const accountLevel = data.accountLevel || (data.role === ROLES.USER ? 'USER' : 'ADMIN');
+  const appAccess = data.appAccess || (data.adminType === ADMIN_TYPES.SUPER_ADMIN ? 'ALL' : '');
+  const wantsGlobalSuper = accountLevel === 'SUPER_ADMIN' && (appAccess === 'ALL' || data.adminType === ADMIN_TYPES.SUPER_ADMIN);
 
-  if (data.role === ROLES.ADMIN) {
-    if (!isSuperAdmin(actorDoc)) throw new ApiError(403, 'Only Super Admin can create Admin accounts');
-    if (![ADMIN_TYPES.SALES_COORDINATOR, ADMIN_TYPES.TENDER_COORDINATOR].includes(data.adminType)) {
-      throw new ApiError(400, 'Admin type is required (Sales Coordinator or Tender Coordinator)');
+  let role = data.role;
+  let adminType = data.adminType;
+  let appSuperAdmin = false;
+  let permissionMap = null;
+  let grantAll = false;
+
+  if (accountLevel === 'USER' || role === ROLES.USER) {
+    role = ROLES.USER;
+    adminType = undefined;
+    appSuperAdmin = false;
+    permissionMap = defaultUserPermissions(data.jobRole, data.appAccess);
+  } else {
+    role = ROLES.ADMIN;
+    if (actorDoc?.role !== ROLES.ADMIN) {
+      throw new ApiError(403, 'Only an Admin can create Admin accounts');
+    }
+    const actorIsGlobalSuper = isSuperAdmin(actorDoc);
+    const actorIsAppSuper = Boolean(actorDoc?.appSuperAdmin);
+
+    if (wantsGlobalSuper) {
+      if (!isPlatformOwner(actorDoc)) {
+        throw new ApiError(403, 'Only Gaurav Jain can create a Super Admin with access to all apps');
+      }
+      adminType = ADMIN_TYPES.SUPER_ADMIN;
+      appSuperAdmin = false;
+      grantAll = true;
+      permissionMap = permissionsForApp('ALL', true);
+    } else {
+      const scopedApp = appAccess && appAccess !== 'ALL' ? appAccess : null;
+      if (!scopedApp) {
+        throw new ApiError(400, 'Select an app for this Admin or Super Admin');
+      }
+      if (!actorHasApp(actorDoc, scopedApp)) {
+        throw new ApiError(403, 'You can only create admins for apps you have access to');
+      }
+      adminType = adminTypeForApp(scopedApp);
+      if (actorIsAppSuper && actorDoc.adminType !== adminType) {
+        throw new ApiError(403, 'You can only create users for your own app');
+      }
+      if (accountLevel === 'SUPER_ADMIN' && !actorIsGlobalSuper) {
+        throw new ApiError(403, 'Only an all-apps Super Admin can create an app Super Admin');
+      }
+      appSuperAdmin = accountLevel === 'SUPER_ADMIN';
+      permissionMap = permissionsForApp(scopedApp);
     }
   }
 
@@ -72,29 +184,31 @@ async function create(data, file, actor) {
     email: data.email,
     password: data.password,
     mobileNumber: data.mobileNumber,
-    role: data.role,
-    adminType: data.role === ROLES.ADMIN ? data.adminType : undefined,
-    jobRole: data.jobRole || (data.role === ROLES.USER ? JOB_ROLES.INSTALLER : undefined),
+    role,
+    adminType: role === ROLES.ADMIN ? adminType : undefined,
+    appSuperAdmin,
+    jobRole: data.jobRole || (role === ROLES.USER ? JOB_ROLES.INSTALLER : undefined),
     gender: Object.values(GENDER).includes(data.gender) ? data.gender : GENDER.MALE,
     profileImage,
     createdBy: actorId,
     updatedBy: actorId,
   });
 
-  if (user.role === ROLES.ADMIN || data.permissions) {
-    const permission = await permissionService.createDefaultPermissions(user._id, { actorId });
-    user.permissions = permission._id;
-    let parsed = data.permissions;
-    if (typeof parsed === 'string') {
-      try { parsed = JSON.parse(parsed); } catch { parsed = {}; }
-    }
-    if (!parsed || typeof parsed !== 'object') parsed = {};
-    const merged = { ...defaultAdminPermissions(data.adminType), ...parsed };
-    if (Object.keys(merged).length) {
-      await permissionService.updatePermissions(user._id, merged, actorId);
-    }
-    await user.save();
+  const permission = await permissionService.createDefaultPermissions(user._id, {
+    actorId,
+    grantAll,
+  });
+  user.permissions = permission._id;
+  let parsed = data.permissions;
+  if (typeof parsed === 'string') {
+    try { parsed = JSON.parse(parsed); } catch { parsed = {}; }
   }
+  if (!parsed || typeof parsed !== 'object') parsed = {};
+  const merged = { ...(permissionMap || {}), ...parsed };
+  if (Object.keys(merged).length) {
+    await permissionService.updatePermissions(user._id, merged, actorId);
+  }
+  await user.save();
 
   await emailService.sendWelcomeEmail(user, data.password);
 
@@ -104,6 +218,9 @@ async function create(data, file, actor) {
 async function update(id, data, file, actorId) {
   const user = await userRepository.findById(id);
   if (!user) throw new ApiError(404, 'User not found');
+  if (isLockedSuperAdmin(user) && data.adminType && data.adminType !== ADMIN_TYPES.SUPER_ADMIN) {
+    throw new ApiError(403, 'Super Admin role cannot be changed');
+  }
 
   const updates = { updatedBy: actorId };
   ['name', 'mobileNumber', 'adminType', 'jobRole', 'gender'].forEach((field) => {
@@ -144,6 +261,9 @@ async function update(id, data, file, actorId) {
 async function remove(id) {
   const user = await userRepository.findById(id);
   if (!user) throw new ApiError(404, 'User not found');
+  if (isLockedSuperAdmin(user)) {
+    throw new ApiError(403, 'Super Admin accounts cannot be deleted');
+  }
 
   if (user.profileImage?.publicId) {
     await uploadService.deleteAsset(user.profileImage.publicId, 'image');
@@ -153,6 +273,7 @@ async function remove(id) {
   }
   await refreshTokenRepository.revokeAllForUser(user._id);
   await userRepository.deleteById(id);
+  return { _id: user._id, name: user.name, email: user.email };
 }
 
 async function updateStatus(id, status, actorId) {
@@ -164,19 +285,28 @@ async function updateStatus(id, status, actorId) {
   return getById(id);
 }
 
-async function triggerPasswordReset(id) {
+async function triggerPasswordReset(id, actor) {
   const user = await userRepository.findById(id);
   if (!user) throw new ApiError(404, 'User not found');
+  if (!canSetPassword(actor, user)) {
+    throw new ApiError(403, 'You can only change your own Super Admin password');
+  }
   await authService.forgotPassword(user.email);
 }
 
-async function setPassword(id, newPassword) {
-  const user = await userRepository.findById(id);
+async function setPassword(id, newPassword, actor) {
+  const user = await userRepository.findByIdWithPassword(id);
   if (!user) throw new ApiError(404, 'User not found');
+  if (!canSetPassword(actor, user)) {
+    throw new ApiError(403, 'You can only change your own Super Admin password');
+  }
 
-  // Use the model's password setter so the pre-save hook hashes it
+  await rejectIfPasswordReused(user, newPassword);
+
+  // Use the model's password setter so the pre-save hook hashes it.
+  // validateModifiedOnly: Gaurav's row has an empty mobile and full validation would fail.
   user.password = newPassword;
-  await user.save();
+  await user.save({ validateModifiedOnly: true });
 
   // Revoke all active sessions so they must re-login with the new password
   await refreshTokenRepository.revokeAllForUser(user._id);
@@ -187,6 +317,9 @@ async function setPassword(id, newPassword) {
 async function updatePermissions(id, updates, actorId) {
   const user = await userRepository.findById(id);
   if (!user) throw new ApiError(404, 'User not found');
+  if (isLockedSuperAdmin(user)) {
+    throw new ApiError(403, 'Super Admin already has access to every app');
+  }
 
   const keys = user.role === ROLES.ADMIN ? undefined : permissionService.INSTALLER_PERMISSION_KEYS;
   await permissionService.updatePermissions(id, updates, actorId, keys);

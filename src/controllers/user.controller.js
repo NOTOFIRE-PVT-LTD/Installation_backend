@@ -36,8 +36,8 @@ const update = asyncHandler(async (req, res) => {
 });
 
 const remove = asyncHandler(async (req, res) => {
-  await userService.remove(req.params.id);
-  sendSuccess(res, { message: 'User deleted' });
+  const removed = await userService.remove(req.params.id);
+  sendSuccess(res, { message: 'User deleted', data: removed });
 });
 
 const updateStatus = asyncHandler(async (req, res) => {
@@ -46,12 +46,12 @@ const updateStatus = asyncHandler(async (req, res) => {
 });
 
 const resetPassword = asyncHandler(async (req, res) => {
-  await userService.triggerPasswordReset(req.params.id);
+  await userService.triggerPasswordReset(req.params.id, req.user);
   sendSuccess(res, { message: 'Password reset email has been sent to the user' });
 });
 
 const setPassword = asyncHandler(async (req, res) => {
-  await userService.setPassword(req.params.id, req.body.password);
+  await userService.setPassword(req.params.id, req.body.password, req.user);
   sendSuccess(res, { message: 'Password updated successfully. All active sessions for this user have been revoked.' });
 });
 

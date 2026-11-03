@@ -1,7 +1,7 @@
 const userService = require('./user.service');
 const userRepository = require('../repositories/user.repository');
 const ApiError = require('../utils/ApiError');
-const { ROLES, USER_STATUS, JOB_ROLES } = require('../config/constants');
+const { ROLES, USER_STATUS, JOB_ROLES, ADMIN_TYPES } = require('../config/constants');
 
 const SALESPERSON_PERMS = {
   customers: true,
@@ -13,10 +13,28 @@ const SALESPERSON_PERMS = {
 };
 
 async function list(query) {
-  return userService.list({ ...query, role: ROLES.USER, jobRole: JOB_ROLES.SALESPERSON });
+  if (query.role === ROLES.USER) {
+    return userService.list({ ...query, role: ROLES.USER, jobRole: JOB_ROLES.SALESPERSON });
+  }
+  if (query.role === ROLES.ADMIN) {
+    return userService.list({ ...query, role: ROLES.ADMIN, adminType: ADMIN_TYPES.SALES_COORDINATOR });
+  }
+  return userService.list({ ...query, scope: 'attendance' });
 }
 
 async function create(data, actor) {
+  if (data.role === ROLES.ADMIN) {
+    return userService.create(
+      {
+        ...data,
+        role: ROLES.ADMIN,
+        adminType: data.adminType || ADMIN_TYPES.SALES_COORDINATOR,
+        permissions: { salespersonTracking: true, customers: true, attendance: true },
+      },
+      null,
+      actor
+    );
+  }
   return userService.create(
     { ...data, role: ROLES.USER, jobRole: JOB_ROLES.SALESPERSON, permissions: SALESPERSON_PERMS },
     null,
@@ -26,16 +44,16 @@ async function create(data, actor) {
 
 async function update(id, data, actorId) {
   const user = await userRepository.findById(id);
-  if (!user || user.role !== ROLES.USER || user.jobRole !== JOB_ROLES.SALESPERSON) {
-    throw new ApiError(404, 'Salesperson not found');
+  if (!user) {
+    throw new ApiError(404, 'User not found');
   }
-  return userService.update(id, { ...data, role: ROLES.USER, jobRole: JOB_ROLES.SALESPERSON }, null, actorId);
+  return userService.update(id, data, null, actorId);
 }
 
 async function updateStatus(id, status, actorId) {
   const user = await userRepository.findById(id);
-  if (!user || user.role !== ROLES.USER || user.jobRole !== JOB_ROLES.SALESPERSON) {
-    throw new ApiError(404, 'Salesperson not found');
+  if (!user) {
+    throw new ApiError(404, 'User not found');
   }
   if (!Object.values(USER_STATUS).includes(status)) throw new ApiError(400, 'Invalid status');
   return userService.updateStatus(id, status, actorId);

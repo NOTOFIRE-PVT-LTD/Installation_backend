@@ -25,6 +25,7 @@ const userSchema = new Schema(
       type: String,
       enum: Object.values(ADMIN_TYPES),
     },
+    appSuperAdmin: { type: Boolean, default: false },
     jobRole: {
       type: String,
       enum: Object.values(JOB_ROLES),

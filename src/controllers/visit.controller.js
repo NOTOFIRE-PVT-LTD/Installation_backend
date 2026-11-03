@@ -67,6 +67,11 @@ const submitDay = asyncHandler(async (req, res) => {
   sendSuccess(res, { message: 'Day submitted', data: result });
 });
 
+const dailySummary = asyncHandler(async (req, res) => {
+  const result = await visitService.dailySummary(req.query, req.user);
+  sendSuccess(res, { message: 'Daily visit summary fetched', data: result });
+});
+
 module.exports = {
   list,
   today,
@@ -81,4 +86,5 @@ module.exports = {
   getDay,
   selectDay,
   submitDay,
+  dailySummary,
 };

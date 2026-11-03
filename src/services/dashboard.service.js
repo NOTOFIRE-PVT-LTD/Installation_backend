@@ -338,14 +338,14 @@ function buildProjectMaterialChart(project) {
       category: 'Stations',
       status: 'completed',
       value: stationsCompleted,
-      color: '#0f766e',
+      color: '#8C591D',
     },
     {
       name: 'Stations not completed',
       category: 'Stations',
       status: 'notCompleted',
       value: stationsNotCompleted,
-      color: '#f59e0b',
+      color: '#FBE7A1',
     },
   ].filter((slice) => slice.value > 0);
 

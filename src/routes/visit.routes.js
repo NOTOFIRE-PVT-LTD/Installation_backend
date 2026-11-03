@@ -22,6 +22,8 @@ router.post(
 router.get('/', validate(visitValidator.list), visitController.list);
 router.get('/today', visitController.today);
 router.get('/day', visitController.getDay);
+router.get('/daily-summary', visitController.dailySummary);
+router.get('/summary', visitController.dailySummary);
 router.post('/day', validate(visitValidator.selectDay), visitController.selectDay);
 router.post('/day/submit', visitController.submitDay);
 router.post('/', validate(visitValidator.create), visitController.create);

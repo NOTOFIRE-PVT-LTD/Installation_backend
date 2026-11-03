@@ -16,6 +16,12 @@ const auditLogSchema = new Schema(
       index: true,
       trim: true,
     },
+    app: {
+      type: String,
+      default: '',
+      index: true,
+      trim: true,
+    },
     description: {
       type: String,
       required: true,

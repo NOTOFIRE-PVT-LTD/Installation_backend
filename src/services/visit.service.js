@@ -273,12 +273,13 @@ async function checkIn(id, data, file, actor) {
   if (!visit) throw new ApiError(404, 'Visit not found');
   assertOwnVisit(visit, actor);
   if (visit.checkInAt) throw new ApiError(400, 'Visit has already been checked in');
-  assertTransition(visit.status, VISIT_STATUS.IN_PROGRESS);
-  await assertSequentialStart(visit, actor);
 
   const { lat, lng } = parseCoords(data.lat, data.lng);
   const location = resolveLocation(visit, visit.customer);
+  const proceedAnyway = data.proceedAnyway === true || data.proceedAnyway === 'true';
+  let isOutOfRange = false;
   let distanceM = 0;
+
   if (location.lat == null || location.lng == null) {
     if (visit.customer?._id) {
       await customerRepository.updateById(visit.customer._id, {
@@ -289,18 +290,28 @@ async function checkIn(id, data, file, actor) {
     }
   } else {
     const measured = measureAgainstVisit(visit, visit.customer, lat, lng);
-    if (!measured.withinGeofence) {
-      throw new ApiError(
-        400,
-        `You are outside the allowed visit location (${Math.round(measured.distanceM)}m away). Move within ${measured.allowedRadiusMeters} meters of the customer to check in.`
-      );
-    }
     distanceM = Math.round(measured.distanceM);
+    if (!measured.withinGeofence) {
+      if (!proceedAnyway) {
+        throw new ApiError(
+          400,
+          `You are outside the allowed customer location (${distanceM}m away). Move within ${measured.allowedRadiusMeters} meters to check in, or choose 'Proceed Anyway' for admin approval.`
+        );
+      }
+      isOutOfRange = true;
+    }
   }
 
+  const nextStatus = isOutOfRange ? VISIT_STATUS.PENDING_APPROVAL : VISIT_STATUS.IN_PROGRESS;
+  assertTransition(visit.status, nextStatus);
+  await assertSequentialStart(visit, actor);
+
   const photo = await uploadService.uploadImageBuffer(file.buffer);
+  const outOfRangeReason = 'Outside location / Geofence exception';
+  const outOfRangeExplanation = String(data.explanation || `Checked in ${distanceM}m away from registered customer location`).trim();
+
   await visitRepository.updateById(visit._id, {
-    status: VISIT_STATUS.IN_PROGRESS,
+    status: nextStatus,
     checkInAt: new Date(),
     checkInLat: lat,
     checkInLng: lng,
@@ -308,7 +319,26 @@ async function checkIn(id, data, file, actor) {
     checkInPhotoUrl: photo.url,
     checkInPhotoPublicId: photo.publicId,
     checkInAddress: String(data.address || '').trim(),
+    ...(isOutOfRange
+      ? {
+          missedReason: outOfRangeReason,
+          missedExplanation: outOfRangeExplanation,
+        }
+      : {}),
   });
+
+  if (isOutOfRange) {
+    await visitApprovalRepository.create({
+      visit: visit._id,
+      kind: VISIT_EXCEPTION_KIND.OUT_OF_RANGE,
+      requestedBy: actor._id,
+      requestedAt: new Date(),
+      decision: VISIT_APPROVAL_DECISION.PENDING,
+      missedReason: outOfRangeReason,
+      missedExplanation: outOfRangeExplanation,
+    });
+  }
+
   return getById(visit._id, actor);
 }
 
@@ -321,31 +351,44 @@ async function checkOut(id, data, file, actor) {
   if (!visit) throw new ApiError(404, 'Visit not found');
   assertOwnVisit(visit, actor);
   if (!visit.checkInAt) throw new ApiError(400, 'Check in first');
-  assertTransition(visit.status, VISIT_STATUS.COMPLETED);
 
   const { lat, lng } = parseCoords(data.lat, data.lng);
   const location = resolveLocation(visit, visit.customer);
+  const proceedAnyway = data.proceedAnyway === true || data.proceedAnyway === 'true';
+  let isOutOfRange = false;
   let distanceM = 0;
+
   if (location.lat != null && location.lng != null) {
     const measured = measureAgainstVisit(visit, visit.customer, lat, lng);
-    if (!measured.withinGeofence) {
-      throw new ApiError(
-        400,
-        `You are outside the allowed visit location (${Math.round(measured.distanceM)}m away). Move within ${measured.allowedRadiusMeters} meters of the customer to check out.`
-      );
-    }
     distanceM = Math.round(measured.distanceM);
+    if (!measured.withinGeofence) {
+      if (!proceedAnyway && visit.status !== VISIT_STATUS.PENDING_APPROVAL) {
+        throw new ApiError(
+          400,
+          `You are outside the allowed customer location (${distanceM}m away). Move within ${measured.allowedRadiusMeters} meters to check out, or choose 'Proceed Anyway' for admin approval.`
+        );
+      }
+      isOutOfRange = true;
+    }
   }
 
   const remark = String(data.outcomeNotes || '').trim();
   if (!remark) throw new ApiError(400, 'Remark is required to check out');
 
+  const nextStatus =
+    visit.status === VISIT_STATUS.PENDING_APPROVAL || isOutOfRange
+      ? VISIT_STATUS.PENDING_APPROVAL
+      : VISIT_STATUS.COMPLETED;
+
+  assertTransition(visit.status, nextStatus);
+
   const photo = await uploadService.uploadImageBuffer(file.buffer);
   const duration = Math.max(0, Math.round((Date.now() - new Date(visit.checkInAt).getTime()) / 60000));
   const origin = await previousTravelPoint(actor, visit);
-  const travelKm = origin ? travelKmBetween(origin, { lat, lng: lng }) : 0;
+  const travelKm = origin ? travelKmBetween(origin, { lat, lng }) : 0;
+
   await visitRepository.updateById(visit._id, {
-    status: VISIT_STATUS.COMPLETED,
+    status: nextStatus,
     checkOutAt: new Date(),
     checkOutLat: lat,
     checkOutLng: lng,
@@ -357,6 +400,25 @@ async function checkOut(id, data, file, actor) {
     travelKm,
     outcomeNotes: remark,
   });
+
+  if (isOutOfRange && visit.status !== VISIT_STATUS.PENDING_APPROVAL) {
+    const outOfRangeReason = 'Outside location / Geofence exception';
+    const outOfRangeExplanation = String(data.explanation || `Checked out ${distanceM}m away from registered customer location`).trim();
+    await visitApprovalRepository.create({
+      visit: visit._id,
+      kind: VISIT_EXCEPTION_KIND.OUT_OF_RANGE,
+      requestedBy: actor._id,
+      requestedAt: new Date(),
+      decision: VISIT_APPROVAL_DECISION.PENDING,
+      missedReason: outOfRangeReason,
+      missedExplanation: outOfRangeExplanation,
+    });
+    await visitRepository.updateById(visit._id, {
+      missedReason: outOfRangeReason,
+      missedExplanation: outOfRangeExplanation,
+    });
+  }
+
   return getById(visit._id, actor);
 }
 
@@ -425,7 +487,18 @@ async function reviewApproval(id, data, actor) {
 
   const visit = await visitRepository.findById(approval.visit);
   if (!visit) throw new ApiError(404, 'Visit not found');
-  const nextStatus = decision === VISIT_APPROVAL_DECISION.APPROVED ? VISIT_STATUS.APPROVED_MISSED : VISIT_STATUS.REJECTED;
+
+  let nextStatus;
+  if (decision === VISIT_APPROVAL_DECISION.APPROVED) {
+    if (approval.kind === VISIT_EXCEPTION_KIND.OUT_OF_RANGE) {
+      nextStatus = visit.checkOutAt ? VISIT_STATUS.COMPLETED : VISIT_STATUS.IN_PROGRESS;
+    } else {
+      nextStatus = VISIT_STATUS.APPROVED_MISSED;
+    }
+  } else {
+    nextStatus = VISIT_STATUS.REJECTED;
+  }
+
   assertTransition(visit.status, nextStatus);
 
   await visitApprovalRepository.updateById(approval._id, {
@@ -468,12 +541,19 @@ async function assertSequentialStart(visit, actor) {
       throw new ApiError(400, "Select today's visits on Visit Plan before checking in");
     }
   }
-  const inProgress = queue.find((row) => row.status === VISIT_STATUS.IN_PROGRESS);
+  const inProgress = queue.find(
+    (row) =>
+      row.status === VISIT_STATUS.IN_PROGRESS ||
+      (row.status === VISIT_STATUS.PENDING_APPROVAL && row.checkInAt && !row.checkOutAt)
+  );
   if (inProgress && String(inProgress._id) !== String(visit._id)) {
     throw new ApiError(400, 'Finish the in-progress visit first');
   }
   const next = queue.find(
-    (row) => row.status !== VISIT_STATUS.COMPLETED && row.status !== VISIT_STATUS.APPROVED_MISSED
+    (row) =>
+      row.status !== VISIT_STATUS.COMPLETED &&
+      row.status !== VISIT_STATUS.APPROVED_MISSED &&
+      !(row.status === VISIT_STATUS.PENDING_APPROVAL && row.checkOutAt)
   );
   if (next && String(next._id) !== String(visit._id)) {
     throw new ApiError(400, 'Complete visits in order');
@@ -508,7 +588,10 @@ function decorateDay(day, visits, expense) {
     ? day.visitIds.map((id) => visits.find((v) => String(v._id) === String(id))).filter(Boolean)
     : [];
   const completed = selected.filter(
-    (v) => v.status === VISIT_STATUS.COMPLETED || v.status === VISIT_STATUS.APPROVED_MISSED
+    (v) =>
+      v.status === VISIT_STATUS.COMPLETED ||
+      v.status === VISIT_STATUS.APPROVED_MISSED ||
+      (v.status === VISIT_STATUS.PENDING_APPROVAL && v.checkOutAt)
   ).length;
   const totalKm = selected.reduce((sum, v) => sum + (Number(v.travelKm) || 0), 0);
   return {
@@ -569,7 +652,10 @@ async function submitDay(actor) {
   if (day.status === DAY_VISIT_STATUS.SUBMITTED) throw new ApiError(400, 'Today is already submitted');
   const selected = await orderedDayVisits(actor._id, date, day.visitIds);
   const unfinished = selected.filter(
-    (v) => v.status !== VISIT_STATUS.COMPLETED && v.status !== VISIT_STATUS.APPROVED_MISSED
+    (v) =>
+      v.status !== VISIT_STATUS.COMPLETED &&
+      v.status !== VISIT_STATUS.APPROVED_MISSED &&
+      !(v.status === VISIT_STATUS.PENDING_APPROVAL && v.checkOutAt)
   );
   if (unfinished.length) throw new ApiError(400, 'Complete every selected visit before submitting the day');
   await dailyVisitDayRepository.updateById(day._id, { status: DAY_VISIT_STATUS.SUBMITTED, submittedAt: new Date() });
@@ -613,6 +699,123 @@ async function ensureDraftExpense(salespersonId, date, day, visits) {
   return visitExpenseRepository.create(payload);
 }
 
+async function dailySummary(query, actor) {
+  let salespersonId = actor._id;
+  if (actor.role === ROLES.ADMIN && query.salesperson) {
+    salespersonId = query.salesperson;
+  }
+
+  const visitFilter = { salesperson: salespersonId };
+  if (query.startDate && query.endDate) {
+    visitFilter.visitDate = { $gte: String(query.startDate), $lte: String(query.endDate) };
+  } else if (query.startDate) {
+    visitFilter.visitDate = { $gte: String(query.startDate) };
+  } else if (query.endDate) {
+    visitFilter.visitDate = { $lte: String(query.endDate) };
+  }
+
+  const visits = await visitRepository.find(visitFilter, {
+    sort: { visitDate: -1, plannedTime: 1, createdAt: 1 },
+    populate: VISIT_POPULATE,
+  });
+
+  const expenseFilter = { salesperson: salespersonId };
+  if (query.startDate && query.endDate) {
+    expenseFilter.date = { $gte: String(query.startDate), $lte: String(query.endDate) };
+  } else if (query.startDate) {
+    expenseFilter.date = { $gte: String(query.startDate) };
+  } else if (query.endDate) {
+    expenseFilter.date = { $lte: String(query.endDate) };
+  }
+
+  const expenses = await visitExpenseRepository.find(expenseFilter, {
+    populate: EXPENSE_POPULATE,
+    sort: { date: -1 },
+  });
+  const expenseByDate = new Map();
+  for (const exp of expenses) {
+    expenseByDate.set(exp.date, exp);
+  }
+
+  const dayFilter = { salesperson: salespersonId };
+  if (query.startDate && query.endDate) {
+    dayFilter.date = { $gte: String(query.startDate), $lte: String(query.endDate) };
+  }
+  const dayRecords = await dailyVisitDayRepository.find(dayFilter);
+  const dayByDate = new Map();
+  for (const d of dayRecords) {
+    dayByDate.set(d.date, d);
+  }
+
+  // Group visits by date
+  const groups = new Map();
+  for (const v of visits) {
+    const d = v.visitDate || 'Unknown Date';
+    if (!groups.has(d)) {
+      groups.set(d, []);
+    }
+    groups.get(d).push(decorate(v));
+  }
+
+  // Include dates that have an expense even if no visits recorded
+  for (const exp of expenses) {
+    if (!groups.has(exp.date)) {
+      groups.set(exp.date, []);
+    }
+  }
+
+  const dates = Array.from(groups.keys()).sort((a, b) => b.localeCompare(a));
+
+  return dates.map((date) => {
+    const dateVisits = groups.get(date) || [];
+    const exp = expenseByDate.get(date) || null;
+    const day = dayByDate.get(date) || null;
+
+    const completed = dateVisits.filter(
+      (v) =>
+        v.status === VISIT_STATUS.COMPLETED ||
+        (v.status === VISIT_STATUS.PENDING_APPROVAL && v.checkOutAt)
+    ).length;
+    const missed = dateVisits.filter(
+      (v) =>
+        v.status === VISIT_STATUS.APPROVED_MISSED ||
+        (v.status === VISIT_STATUS.PENDING_APPROVAL && !v.checkInAt)
+    ).length;
+    const inProgress = dateVisits.filter(
+      (v) =>
+        v.status === VISIT_STATUS.IN_PROGRESS ||
+        (v.status === VISIT_STATUS.PENDING_APPROVAL && v.checkInAt && !v.checkOutAt)
+    ).length;
+    const planned = dateVisits.filter((v) => v.status === VISIT_STATUS.PLANNED).length;
+
+    const totalTravelKm = dateVisits.reduce((sum, v) => sum + (Number(v.travelKm) || 0), 0);
+
+    return {
+      date,
+      totalVisits: dateVisits.length,
+      completedCount: completed,
+      missedCount: missed,
+      inProgressCount: inProgress,
+      plannedCount: planned,
+      totalTravelKm: Math.round(totalTravelKm * 10) / 10,
+      dayStatus: day?.status || (dateVisits.length ? 'NOT_SUBMITTED' : 'NO_VISITS'),
+      submittedAt: day?.submittedAt || null,
+      expense: exp
+        ? {
+            _id: exp._id,
+            totalAmount: exp.totalAmount || 0,
+            totalKm: exp.totalKm || 0,
+            status: exp.status,
+            itemCount: exp.items?.length || 0,
+            items: exp.items || [],
+            adminComment: exp.adminComment || '',
+          }
+        : null,
+      visits: dateVisits,
+    };
+  });
+}
+
 module.exports = {
   list,
   todayPlan,
@@ -629,4 +832,5 @@ module.exports = {
   getDay,
   selectDay,
   submitDay,
+  dailySummary,
 };

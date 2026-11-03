@@ -269,6 +269,9 @@ async function seed() {
     logger.info(`[seed] Attendance ${attendanceDate} ${row.inHm}${row.outHm ? `–${row.outHm}` : ' (open)'}`);
   }
 
+  const { promoteMatchingSuperAdmins } = require('./promoteSuperAdmins');
+  await promoteMatchingSuperAdmins();
+
   logger.info('[seed] Demo logins (password Demo!Pass123):');
   logger.info('  super.admin@demo.local          → Super Admin');
   logger.info('  radha.admin@demo.local          → Sales Coordinator (tracking only)');

@@ -36,11 +36,12 @@ class BaseRepository {
     return this.model.findByIdAndDelete(id);
   }
 
-  find(filter = {}, { populate, sort, select } = {}) {
+  find(filter = {}, { populate, sort, select, limit } = {}) {
     let query = this.model.find(filter);
     if (populate) query = query.populate(populate);
     if (sort) query = query.sort(sort);
     if (select) query = query.select(select);
+    if (limit) query = query.limit(limit);
     return query.exec();
   }
 

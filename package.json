@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
-    "test": "node --test src/utils/customerNormalize.test.js src/utils/geo.test.js src/utils/visitStatus.test.js src/utils/attendanceClassify.test.js src/utils/travelKm.test.js",
+    "test": "node --test src/utils/customerNormalize.test.js src/utils/geo.test.js src/utils/visitStatus.test.js src/utils/attendanceClassify.test.js src/utils/travelKm.test.js src/utils/complaint.test.js src/utils/passwordReuse.test.js",
     "seed": "node src/scripts/seed.js",
     "migrate:products": "node src/scripts/migrateProducts.js",
     "migrate:parties": "node src/scripts/migrateParties.js",
@@ -18,6 +18,7 @@
     "migrate:delivery-challans": "node src/scripts/migrateDeliveryChallans.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.118.0",
     "bcryptjs": "^2.4.3",
     "cloudinary": "^2.5.1",
     "cookie-parser": "^1.4.7",

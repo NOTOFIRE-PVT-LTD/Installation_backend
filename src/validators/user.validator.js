@@ -9,6 +9,8 @@ const create = [
   body('role').isIn(Object.values(ROLES)).withMessage('Invalid role'),
   body('adminType').optional({ checkFalsy: true }).isIn(Object.values(ADMIN_TYPES)),
   body('jobRole').optional().isIn(Object.values(JOB_ROLES)),
+  body('appAccess').optional().isString(),
+  body('accountLevel').optional().isIn(['USER', 'ADMIN', 'SUPER_ADMIN']),
   body('permissions').optional(),
 ];
 
@@ -37,6 +39,7 @@ const updatePermissions = [
 const list = [
   query('page').optional().isInt({ min: 1 }),
   query('pageSize').optional().isInt({ min: 1, max: 100 }),
+  query('apps').optional().isString(),
 ];
 
 const updateProfile = [

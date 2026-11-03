@@ -7,6 +7,8 @@ const ADMIN_TYPES = Object.freeze({
   SUPER_ADMIN: 'SUPER_ADMIN',
   SALES_COORDINATOR: 'SALES_COORDINATOR',
   TENDER_COORDINATOR: 'TENDER_COORDINATOR',
+  COMPLAINT_COORDINATOR: 'COMPLAINT_COORDINATOR',
+  GENERAL_ADMIN: 'GENERAL_ADMIN',
 });
 
 const JOB_ROLES = Object.freeze({
@@ -61,6 +63,7 @@ const VISIT_APPROVAL_DECISION = Object.freeze({
 const VISIT_EXCEPTION_KIND = Object.freeze({
   MISSED: 'MISSED',
   INCOMPLETE: 'INCOMPLETE',
+  OUT_OF_RANGE: 'OUT_OF_RANGE',
 });
 
 const MISSED_VISIT_REASONS = Object.freeze([
@@ -71,6 +74,7 @@ const MISSED_VISIT_REASONS = Object.freeze([
   'Unable to reach location',
   'Location/GPS problem',
   'Customer requested reschedule',
+  'Outside location / Geofence exception',
   'Other',
 ]);
 
@@ -173,6 +177,50 @@ const PERMISSION_KEYS = Object.freeze([
   // Restricts an Atlanta payments user to their own payment records.
   'atlantaPaymentsOwnOnly',
   'auditLogs',
+  // Opt-in module: only admins explicitly granted this flag can open the complaint dashboard.
+  'complaints',
+  'shipping',
+  'importControl',
+]);
+
+const COMPLAINT_STATUS = Object.freeze({
+  OPEN: 'Open',
+  IN_PROGRESS: 'In Progress',
+  RESOLVED: 'Resolved',
+  CLOSED: 'Closed',
+});
+
+const COMPLAINT_PRIORITY = Object.freeze({
+  LOW: 'Low',
+  MEDIUM: 'Medium',
+  HIGH: 'High',
+  CRITICAL: 'Critical',
+});
+
+const COMPLAINT_CATEGORY = Object.freeze({
+  INSTALLATION: 'Installation',
+  PRODUCT_QUALITY: 'Product Quality',
+  SERVICE_DELAY: 'Service Delay',
+  BILLING: 'Billing',
+  OTHER: 'Other',
+});
+
+const COMPLAINT_SOURCE = Object.freeze({
+  QR: 'QR',
+  ADMIN: 'Admin',
+});
+
+// Hours from complaint creation until the complaint is due for resolution.
+const COMPLAINT_SLA_HOURS = Object.freeze({
+  Low: 72,
+  Medium: 48,
+  High: 24,
+  Critical: 4,
+});
+
+const COMPLAINT_ACTIVE_STATUSES = Object.freeze([
+  COMPLAINT_STATUS.OPEN,
+  COMPLAINT_STATUS.IN_PROGRESS,
 ]);
 
 const STOCK_MOVEMENT_TYPES = Object.freeze({
@@ -323,4 +371,10 @@ module.exports = {
   ITEM_MASTER_CATALOG_KINDS,
   ITEM_MASTER_CATALOG_FIELDS,
   ITEM_MASTER_ITEM_CATALOG_FIELDS,
+  COMPLAINT_STATUS,
+  COMPLAINT_PRIORITY,
+  COMPLAINT_CATEGORY,
+  COMPLAINT_SOURCE,
+  COMPLAINT_SLA_HOURS,
+  COMPLAINT_ACTIVE_STATUSES,
 };

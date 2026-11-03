@@ -131,6 +131,17 @@ const uploadAtlantaPaymentProofs = upload.array('atlantaProofs', 50);
 const uploadVisitPhoto = upload.single('photo');
 const uploadAttendancePhoto = upload.single('photo');
 const uploadExpenseTicket = upload.single('ticket');
+// Public endpoint: keep the limit at the image size, not the (much larger) video limit.
+const uploadComplaintPhotos = multer({
+  storage,
+  fileFilter: (req, file, cb) => {
+    if (!IMAGE_MIME_TYPES.includes(file.mimetype)) {
+      return cb(new Error('Only jpeg, png, or webp images are allowed'));
+    }
+    cb(null, true);
+  },
+  limits: { fileSize: env.upload.maxImageSizeMb * 1024 * 1024 },
+}).array('photos', 3);
 
 module.exports = {
   uploadAtlantaPaymentProofs,
@@ -150,4 +161,5 @@ module.exports = {
   uploadVisitPhoto,
   uploadAttendancePhoto,
   uploadExpenseTicket,
+  uploadComplaintPhotos,
 };
