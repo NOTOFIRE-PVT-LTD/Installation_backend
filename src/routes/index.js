@@ -35,10 +35,14 @@ const auditLogRoutes = require('./auditLog.routes');
 const complaintRoutes = require('./complaint.routes');
 const companionRoutes = require('./companion.routes');
 const centralRoutes = require('./central.routes');
+const shippingRoutes = require('./shipping.routes');
+const importControlRoutes = require('./importControl.routes');
 
 const router = express.Router();
 
 router.use('/central', centralRoutes);
+router.use('/shipping', shippingRoutes);
+router.use('/import-control', importControlRoutes);
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
 router.use('/people', peopleRoutes);
