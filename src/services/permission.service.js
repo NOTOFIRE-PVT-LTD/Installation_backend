@@ -1,10 +1,9 @@
 const permissionRepository = require('../repositories/permission.repository');
 const { PERMISSION_KEYS, ROLES, ADMIN_TYPES } = require('../config/constants');
+const { isSuperAdmin, adminHasPermission } = require('../utils/roles');
 
-// These modules are opt-in for every admin except the Super Admin. A missing flag means
-// "no access" rather than the usual "newly added module, allow by default".
-const OPT_IN_ADMIN_KEYS = ['complaints', 'shipping', 'importControl'];
-
+// Admin modules are all opt-in: missing/null flag = no access. Super Admin is the only
+// role that gets every key. Prevents attendance/complaints/projects admins from mixing apps.
 const DEFAULT_INSTALLER_MODULES = ['projects', 'reports', 'cadDrawing', 'customers', 'attendance'];
 const INSTALLER_PERMISSION_KEYS = [
   'projects',
@@ -21,19 +20,13 @@ const INSTALLER_PERMISSION_KEYS = [
 
 function serializePermissions(user) {
   if (user.role === ROLES.ADMIN) {
-    const isSuperAdmin = user.adminType === ADMIN_TYPES.SUPER_ADMIN;
     // Super Admin always gets every module — even if permissions doc is missing.
-    if (isSuperAdmin) {
+    if (isSuperAdmin(user) || user.adminType === ADMIN_TYPES.SUPER_ADMIN) {
       return PERMISSION_KEYS.reduce((acc, key) => ({ ...acc, [key]: true }), {});
     }
     if (!user.permissions) return null;
-    const perm = user.permissions._doc || user.permissions;
     return PERMISSION_KEYS.reduce((acc, key) => {
-      if (OPT_IN_ADMIN_KEYS.includes(key)) {
-        acc[key] = Boolean(perm[key]);
-      } else {
-        acc[key] = perm[key] == null ? true : Boolean(perm[key]);
-      }
+      acc[key] = adminHasPermission(user, key);
       return acc;
     }, {});
   }

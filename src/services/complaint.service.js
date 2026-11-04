@@ -6,7 +6,6 @@ const {
   notifyCustomerTicketCreated,
   notifyCustomerTicketResolved,
   notifyCustomerTicketAssigned,
-  normalizeChannel,
 } = require('./complaintNotify.service');
 const { calculateWarrantyStatus } = require('../utils/warranty');
 const { canTransitionStatus } = require('../utils/statusFlow');
@@ -177,12 +176,12 @@ function buildFilter(query = {}, currentUser = null) {
 }
 
 async function notifyTicketCreated(complaint) {
-  const logs = await notifyCustomerTicketCreated(complaint, complaint.notifyChannel || 'whatsapp');
+  const logs = await notifyCustomerTicketCreated(complaint, complaint.notifyChannel);
   if (logs?.length) complaint.emailLogs.push(...logs);
 }
 
 async function notifyTicketResolved(complaint) {
-  const logs = await notifyCustomerTicketResolved(complaint, complaint.notifyChannel || 'whatsapp');
+  const logs = await notifyCustomerTicketResolved(complaint, complaint.notifyChannel);
   if (logs?.length) complaint.emailLogs.push(...logs);
 }
 
@@ -536,10 +535,16 @@ class ComplaintService {
 
     const customerName = String(data.customerName || '').trim();
     const contactNumber = String(data.contactNumber || data.customerPhone || '').trim();
+    const whatsappNumber = String(
+      data.whatsappNumber || data.whatsappMobile || contactNumber || ''
+    ).trim();
     const description = String(data.description || '').trim();
 
-    if (!customerName || !contactNumber || !description) {
-      throw new ApiError(400, 'Customer name, phone number, and description are required.');
+    if (!customerName || !contactNumber || !whatsappNumber || !description) {
+      throw new ApiError(
+        400,
+        'Customer name, phone number, WhatsApp number, and description are required.'
+      );
     }
 
     // Evaluate warranty
@@ -558,6 +563,7 @@ class ComplaintService {
       source: 'SELF_SERVICE',
       customerName,
       contactNumber,
+      whatsappNumber,
       email: String(data.email || data.customerEmail || '').trim().toLowerCase(),
       companyName: String(data.companyName || data.customerOrganization || '').trim(),
       customerOrganization: String(data.customerOrganization || data.companyName || '').trim(),
@@ -582,7 +588,7 @@ class ComplaintService {
       photos,
       status: 'NEW',
       isAcknowledged: false,
-      notifyChannel: normalizeChannel(data.notifyChannel || 'whatsapp'),
+      notifyChannel: 'whatsapp',
       dueAt: dueAtFor(priority, now),
       activityLogs: [
         {
@@ -604,10 +610,16 @@ class ComplaintService {
   async createInternal(data, currentUser) {
     const customerName = String(data.customerName || '').trim();
     const contactNumber = String(data.contactNumber || data.customerPhone || '').trim();
+    const whatsappNumber = String(
+      data.whatsappNumber || data.whatsappMobile || contactNumber || ''
+    ).trim();
     const description = String(data.description || '').trim();
 
-    if (!customerName || !contactNumber || !description) {
-      throw new ApiError(400, 'Customer name, phone number, and complaint description are required.');
+    if (!customerName || !contactNumber || !whatsappNumber || !description) {
+      throw new ApiError(
+        400,
+        'Customer name, mobile number, WhatsApp number, and complaint description are required.'
+      );
     }
 
     // Resolve or link Customer record, or auto-create Customer so it is stored and available in autocomplete next time
@@ -689,6 +701,7 @@ class ComplaintService {
       customerId,
       customerName,
       contactNumber,
+      whatsappNumber,
       email: String(data.email || data.customerEmail || '').trim().toLowerCase(),
       companyName: String(data.companyName || data.customerOrganization || '').trim(),
       customerOrganization: String(data.customerOrganization || data.companyName || '').trim(),
@@ -721,7 +734,7 @@ class ComplaintService {
       takenTime: String(data.takenTime || '').trim(),
       attempt: Math.max(1, Number(data.attempt) || 1),
       deliveryStatus: String(data.deliveryStatus || '').trim(),
-      notifyChannel: normalizeChannel(data.notifyChannel || 'whatsapp'),
+      notifyChannel: 'whatsapp',
       assignedTo,
       assignedAt: assignedTo ? now : null,
       complaintHandlerId: currentUser ? currentUser._id : null,
@@ -766,7 +779,7 @@ class ComplaintService {
         const assignLogs = await notifyCustomerTicketAssigned(
           complaint,
           engName,
-          complaint.notifyChannel || 'whatsapp'
+          complaint.notifyChannel
         );
         if (assignLogs?.length) complaint.emailLogs.push(...assignLogs);
       } catch (err) {
@@ -881,7 +894,7 @@ class ComplaintService {
       const assignLogs = await notifyCustomerTicketAssigned(
         complaint,
         engineer.name,
-        complaint.notifyChannel || 'whatsapp'
+        complaint.notifyChannel
       );
       if (assignLogs?.length) complaint.emailLogs.push(...assignLogs);
     } catch (err) {
@@ -1150,6 +1163,7 @@ class ComplaintService {
 
     assignField('customerName', 'Customer Name');
     assignField('contactNumber', 'Phone Number');
+    assignField('whatsappNumber', 'WhatsApp Number');
     assignField('email', 'Email');
     assignField('companyName', 'Organization');
     assignField('customerOrganization', 'Organization');

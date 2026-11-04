@@ -11,15 +11,9 @@ const { kolkataToday } = require('../utils/kolkataDate');
 const { shiftDate, durationMin } = require('../utils/attendanceClassify');
 const logger = require('../utils/logger');
 
-const TRACKING_KEYS = { salespersonTracking: true, customers: true, attendance: true };
-const TENDER_KEYS = {
-  tenders: true,
-  tenderWhatsappAlerts: true,
-  dashboard: true,
-  salespersonTracking: false,
-  customers: false,
-  attendance: false,
-};
+const { permissionsForApp } = require('../utils/roles');
+const TRACKING_KEYS = permissionsForApp('attendance');
+const TENDER_KEYS = permissionsForApp('tenders');
 const SALESPERSON_KEYS = {
   customers: true,
   attendance: true,

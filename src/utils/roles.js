@@ -6,8 +6,10 @@ const PLATFORM_OWNER_EMAILS = [
   'mansi@gmail.com',
 ];
 
+// One app = one permission set. Do not cross-grant installation dashboard into
+// complaints/attendance admins — that mixed apps in the sidebar and landing path.
 const APP_PERMISSION_SETS = {
-  complaints: ['complaints', 'dashboard'],
+  complaints: ['complaints'],
   attendance: ['attendance', 'salespersonTracking', 'customers'],
   projects: ['projects', 'reports', 'cadDrawing', 'claimApprovals', 'dashboard'],
   tenders: ['tenders', 'tenderWhatsappAlerts', 'dashboard'],
@@ -44,12 +46,9 @@ function permissionsForApp(appAccess, grantAll = false) {
 
 function isSuperAdmin(user) {
   if (user?.role !== ROLES.ADMIN) return false;
-  if (user.adminType === ADMIN_TYPES.SUPER_ADMIN) return true;
-  if (!user.adminType) {
-    const perm = user.permissions?._doc || user.permissions;
-    return Boolean(perm && perm.users !== false && perm.dashboard !== false);
-  }
-  return false;
+  // Only the explicit SUPER_ADMIN type — never infer from loose permission flags
+  // (that let ordinary app admins inherit all-apps access).
+  return user.adminType === ADMIN_TYPES.SUPER_ADMIN;
 }
 
 function isSalesperson(user) {
@@ -88,15 +87,47 @@ function actorHasApp(user, appAccess) {
 
 function defaultAdminPermissions(adminType) {
   if (adminType === ADMIN_TYPES.SALES_COORDINATOR) {
-    return { salespersonTracking: true, customers: true, attendance: true };
+    return permissionsForApp('attendance');
   }
   if (adminType === ADMIN_TYPES.TENDER_COORDINATOR) {
-    return { tenders: true, tenderWhatsappAlerts: true, dashboard: true, salespersonTracking: false, customers: false, attendance: false };
+    return permissionsForApp('tenders');
   }
   if (adminType === ADMIN_TYPES.COMPLAINT_COORDINATOR) {
-    return { complaints: true, dashboard: true, salespersonTracking: false, customers: false, attendance: false };
+    return permissionsForApp('complaints');
   }
   return {};
+}
+
+function adminAppCeiling(user) {
+  if (!user || user.role !== ROLES.ADMIN || isSuperAdmin(user)) return null;
+  if (
+    user.adminType === ADMIN_TYPES.SALES_COORDINATOR ||
+    user.adminType === ADMIN_TYPES.TENDER_COORDINATOR ||
+    user.adminType === ADMIN_TYPES.COMPLAINT_COORDINATOR
+  ) {
+    return defaultAdminPermissions(user.adminType);
+  }
+  return null;
+}
+
+/** Opt-in RBAC + coordinator app ceiling (blocks leftover cross-app Mongo flags). */
+function adminHasPermission(user, key) {
+  if (!user || user.role !== ROLES.ADMIN) return false;
+  if (isSuperAdmin(user)) return true;
+
+  const stored = permissionFlags(user);
+  const ceiling = adminAppCeiling(user);
+
+  if ((key === 'customers' || key === 'attendance') && stored.salespersonTracking === true) {
+    if (!ceiling || ceiling.salespersonTracking === true || ceiling.attendance === true) return true;
+  }
+  if (key === 'customers' && stored.complaints === true) {
+    if (!ceiling || ceiling.complaints === true) return true;
+  }
+
+  if (stored[key] !== true) return false;
+  if (ceiling && ceiling[key] !== true) return false;
+  return true;
 }
 
 function defaultUserPermissions(jobRole, appAccess) {
@@ -123,5 +154,7 @@ module.exports = {
   defaultUserPermissions,
   adminTypeForApp,
   permissionsForApp,
+  adminAppCeiling,
+  adminHasPermission,
   PLATFORM_OWNER_EMAILS,
 };
