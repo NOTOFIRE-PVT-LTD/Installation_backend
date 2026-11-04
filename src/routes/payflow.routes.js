@@ -13,8 +13,8 @@ const router = express.Router();
 // Admin + 'payflow' permission  -> full access ("admin").
 function resolvePayflowAccess(req, _res, next) {
   const permissions = req.user?.permissions;
-  if (permissions?.payflowUser) req.payflowAccess = 'user';
-  else if (req.user?.role === ROLES.ADMIN && permissions?.payflow) req.payflowAccess = 'admin';
+  if (req.user?.role === ROLES.ADMIN && permissions?.payflow) req.payflowAccess = 'admin';
+  else if (permissions?.payflowUser) req.payflowAccess = 'user';
   else return next(new ApiError(403, 'You do not have the "payflow" permission'));
   return next();
 }

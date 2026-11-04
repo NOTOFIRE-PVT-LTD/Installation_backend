@@ -259,36 +259,36 @@ async function migrateQuotations() {
         // -----------------------------------
 
         let companySnapshot = {
-            ref: null,
-            name: '',
-            gstin: '',
-            contactPerson: '',
-            phone: '',
-            email: '',
-            address: '',
+          ref: null,
+          name: '',
+          gstin: '',
+          contactPerson: '',
+          phone: '',
+          email: '',
+          address: '',
         };
-          
+
         if (quotation.company_id) {
-            const companyMaster = await QuotationMaster.findOne({
-              legacySupabaseId: quotation.company_id,
-              kind: 'company',
-            }).lean();
-          
-            if (companyMaster) {
-              companySnapshot = {
-                ref: companyMaster._id,
-                name: companyMaster.name || '',
-                gstin: companyMaster.gstin || '',
-                contactPerson: companyMaster.contactPerson || '',
-                phone: companyMaster.phone || '',
-                email: companyMaster.email || '',
-                address: companyMaster.address || '',
-              };
-            } else {
-              console.log(
-                `   ⚠ Company not found: ${quotation.company_id}`
-              );
-            }
+          const companyMaster = await QuotationMaster.findOne({
+            legacySupabaseId: quotation.company_id,
+            kind: 'company',
+          }).lean();
+
+          if (companyMaster) {
+            companySnapshot = {
+              ref: companyMaster._id,
+              name: companyMaster.name || '',
+              gstin: companyMaster.gstin || '',
+              contactPerson: companyMaster.contactPerson || '',
+              phone: companyMaster.phone || '',
+              email: companyMaster.email || '',
+              address: companyMaster.address || '',
+            };
+          } else {
+            console.log(
+              `   ⚠ Company not found: ${quotation.company_id}`
+            );
+          }
         }
 
         // -----------------------------------
@@ -296,36 +296,36 @@ async function migrateQuotations() {
         // -----------------------------------
 
         let partySnapshot = {
-            ref: null,
-            name: '',
-            gstin: '',
-            contactPerson: '',
-            phone: '',
-            email: '',
-            address: '',
+          ref: null,
+          name: '',
+          gstin: '',
+          contactPerson: '',
+          phone: '',
+          email: '',
+          address: '',
         };
-          
+
         if (quotation.party_id) {
-            const partyMaster = await QuotationMaster.findOne({
-              legacySupabaseId: quotation.party_id,
-              kind: 'party',
-            }).lean();
-          
-            if (partyMaster) {
-              partySnapshot = {
-                ref: partyMaster._id,
-                name: partyMaster.name || '',
-                gstin: partyMaster.gstin || '',
-                contactPerson: partyMaster.contactPerson || '',
-                phone: partyMaster.phone || '',
-                email: partyMaster.email || '',
-                address: partyMaster.address || '',
-              };
-            } else {
-              console.log(
-                `   ⚠ Party not found: ${quotation.party_id}`
-              );
-            }
+          const partyMaster = await QuotationMaster.findOne({
+            legacySupabaseId: quotation.party_id,
+            kind: 'party',
+          }).lean();
+
+          if (partyMaster) {
+            partySnapshot = {
+              ref: partyMaster._id,
+              name: partyMaster.name || '',
+              gstin: partyMaster.gstin || '',
+              contactPerson: partyMaster.contactPerson || '',
+              phone: partyMaster.phone || '',
+              email: partyMaster.email || '',
+              address: partyMaster.address || '',
+            };
+          } else {
+            console.log(
+              `   ⚠ Party not found: ${quotation.party_id}`
+            );
+          }
         }
 
         // -----------------------------------
@@ -535,17 +535,15 @@ async function migrateQuotations() {
         }
 
         console.log(
-          `[${i + 1}/${quotations.length}] ✓ ${
-            quotationNo
+          `[${i + 1}/${quotations.length}] ✓ ${quotationNo
           } | items: ${items.length}`
         );
       } catch (error) {
         failed++;
 
         console.error(
-          `[${i + 1}/${quotations.length}] ✗ ${
-            quotation.quotation_number ||
-            quotation.id
+          `[${i + 1}/${quotations.length}] ✗ ${quotation.quotation_number ||
+          quotation.id
           }`
         );
 
@@ -639,7 +637,7 @@ async function migrateQuotations() {
     console.error(error);
   } finally {
     if (supabaseClient) {
-      await supabaseClient.end().catch(() => {});
+      await supabaseClient.end().catch(() => { });
     }
 
     if (mongoose.connection.readyState !== 0) {

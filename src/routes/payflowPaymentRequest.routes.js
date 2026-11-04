@@ -74,5 +74,8 @@ router.get('/', validate(listRules), controller.list);
 router.post('/', validate(createRules), controller.create);
 router.get('/:id', validate([idParam]), controller.getById);
 router.patch('/:id/status', adminOnly, validate(statusRules), controller.changeStatus);
+router.delete('/:id', adminOnly, validate([idParam]), controller.moveToTrash);
+router.post('/:id/restore', adminOnly, validate([idParam]), controller.restoreFromTrash);
+router.delete('/:id/permanent', adminOnly, validate([idParam]), controller.deletePermanently);
 
 module.exports = router;

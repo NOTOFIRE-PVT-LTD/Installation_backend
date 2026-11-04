@@ -31,7 +31,7 @@ module.exports = {
   }),
   getById: asyncHandler(async (req, res) => {
     const doc = await service.getById(req.params.id, scopeOf(req));
-    const allowedStatuses = req.payflowAccess === 'user' ? [] : service.STATUS_TRANSITIONS[doc.status];
+    const allowedStatuses = req.payflowAccess === 'user' || doc.isDeleted ? [] : service.STATUS_TRANSITIONS[doc.status];
     sendSuccess(res, { message: 'Payment request fetched', data: { ...doc.toObject(), allowedStatuses } });
   }),
   create: asyncHandler(async (req, res) => {
@@ -41,5 +41,20 @@ module.exports = {
   changeStatus: asyncHandler(async (req, res) => {
     const doc = await service.changeStatus(req.params.id, req.body, req.user);
     sendSuccess(res, { message: `Payment request marked as ${doc.status}`, data: { ...doc.toObject(), allowedStatuses: service.STATUS_TRANSITIONS[doc.status] } });
+  }),
+  moveToTrash: asyncHandler(async (req, res) => {
+    const doc = await service.moveToTrash(req.params.id, req.user);
+    sendSuccess(res, { message: 'Payment request moved to trash', data: { ...doc.toObject(), allowedStatuses: [] } });
+  }),
+  restoreFromTrash: asyncHandler(async (req, res) => {
+    const doc = await service.restoreFromTrash(req.params.id, req.user);
+    sendSuccess(res, {
+      message: 'Payment request restored from trash',
+      data: { ...doc.toObject(), allowedStatuses: service.STATUS_TRANSITIONS[doc.status] },
+    });
+  }),
+  deletePermanently: asyncHandler(async (req, res) => {
+    await service.deletePermanently(req.params.id);
+    sendSuccess(res, { message: 'Payment request permanently deleted' });
   }),
 };

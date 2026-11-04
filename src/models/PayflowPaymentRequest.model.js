@@ -82,6 +82,9 @@ const paymentRequestSchema = new Schema(
     history: { type: [historySchema], default: [] },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     updatedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    isDeleted: { type: Boolean, default: false, index: true },
+    deletedAt: { type: Date, default: null },
+    deletedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     legacyData: { type: Schema.Types.Mixed, default: () => ({}), },
   },
   { timestamps: true }

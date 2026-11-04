@@ -1,6 +1,10 @@
 const Project = require('../models/Project.model');
 const Report = require('../models/Report.model');
 const Payment = require('../models/Payment.model');
+const Quotation = require('../models/Quotation.model');
+const ProformaInvoice = require('../models/ProformaInvoice.model');
+const DeliveryChallan = require('../models/DeliveryChallan.model');
+const AtlantaPayment = require('../models/AtlantaPayment.model');
 const { REPORT_STATUS, PAYMENT_STATUS, CLAIM_STATUS, ROLES } = require('../config/constants');
 
 function projectScopeFilter(user) {
@@ -599,6 +603,202 @@ async function getMaterialStatusOverview(user) {
   };
 }
 
+async function getModulesOverview(user) {
+  const quotationFilter = { isDeleted: { $ne: true } };
+  if (user?.permissions?.quotationsOwnOnly) {
+    quotationFilter.createdBy = user._id;
+  }
+
+  const atlantaFilter = {};
+  if (user?.permissions?.atlantaPaymentsOwnOnly) {
+    const orConditions = [{ createdBy: user._id }, { employeeId: String(user._id) }];
+    if (user?.name) {
+      const escaped = String(user.name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      orConditions.push({ employeeName: new RegExp(`^\\s*${escaped}\\s*$`, 'i') });
+    }
+    atlantaFilter.$or = orConditions;
+  }
+
+  const [
+    quotationStatsAgg,
+    recentQuotations,
+    piStatsAgg,
+    recentPis,
+    dcStatsAgg,
+    recentDcs,
+    atlantaStatsAgg,
+    recentAtlanta,
+  ] = await Promise.all([
+    Quotation.aggregate([
+      { $match: quotationFilter },
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 },
+          amount: { $sum: { $ifNull: ['$totalAmount', 0] } },
+        },
+      },
+    ]),
+    Quotation.find(quotationFilter)
+      .sort({ quotationDate: -1, createdAt: -1 })
+      .limit(5)
+      .select('quotationNo quotationDate company.name party.name totalAmount status')
+      .lean(),
+
+    ProformaInvoice.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalCount: { $sum: 1 },
+          totalNetAmount: { $sum: { $ifNull: ['$netAmount', 0] } },
+          totalExGst: { $sum: { $ifNull: ['$totalExGst', 0] } },
+          totalGstAmount: { $sum: { $ifNull: ['$gstAmount', 0] } },
+        },
+      },
+    ]),
+    ProformaInvoice.find({})
+      .sort({ piDate: -1, createdAt: -1 })
+      .limit(5)
+      .select('piNumber piDate companyCode company.name party.name quotation.quotationNo netAmount totalAmount')
+      .lean(),
+
+    DeliveryChallan.aggregate([
+      {
+        $group: {
+          _id: '$sellerCompany',
+          count: { $sum: 1 },
+          totalValue: { $sum: { $ifNull: ['$totalValue', 0] } },
+        },
+      },
+    ]),
+    DeliveryChallan.find({})
+      .sort({ dcDate: -1, createdAt: -1 })
+      .limit(5)
+      .select('dcNumber dcDate sellerCompany company.name recipient.name receiverName placeOfSupply totalValue')
+      .lean(),
+
+    AtlantaPayment.aggregate([
+      { $match: atlantaFilter },
+      {
+        $group: {
+          _id: null,
+          totalCount: { $sum: 1 },
+          totalTada: { $sum: { $ifNull: ['$totalTada', 0] } },
+          totalExpense: { $sum: { $ifNull: ['$totalExpense', 0] } },
+          totalTravelExpenses: { $sum: { $ifNull: ['$totalTravelExpenses', 0] } },
+          totalReceivedAmount: { $sum: { $ifNull: ['$totalReceivedAmount', 0] } },
+          totalAmountToGive: { $sum: { $ifNull: ['$amountToGive', 0] } },
+        },
+      },
+    ]),
+    AtlantaPayment.find(atlantaFilter)
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .select('fileName consigneeName employeeName designation paymentDate totalTada totalExpense totalTravelExpenses totalReceivedAmount amountToGive')
+      .lean(),
+  ]);
+
+  // 1. Quotations summary
+  const quotationByStatus = { draft: 0, sent: 0, accepted: 0, rejected: 0, cancelled: 0 };
+  let quotationTotalCount = 0;
+  let quotationTotalAmount = 0;
+  quotationStatsAgg.forEach((row) => {
+    const key = row._id || 'draft';
+    quotationByStatus[key] = (quotationByStatus[key] || 0) + row.count;
+    quotationTotalCount += row.count;
+    quotationTotalAmount += row.amount || 0;
+  });
+
+  // 2. Proforma Invoices summary
+  const piAgg = piStatsAgg[0] || { totalCount: 0, totalNetAmount: 0, totalExGst: 0, totalGstAmount: 0 };
+
+  // 3. Delivery Challans summary
+  let dcTotalCount = 0;
+  let dcTotalValue = 0;
+  const dcBySeller = { notofire: 0, valuecon: 0 };
+  dcStatsAgg.forEach((row) => {
+    const key = row._id || 'notofire';
+    dcBySeller[key] = (dcBySeller[key] || 0) + row.count;
+    dcTotalCount += row.count;
+    dcTotalValue += row.totalValue || 0;
+  });
+
+  // 4. Atlanta Payments summary
+  const atlantaAgg = atlantaStatsAgg[0] || {
+    totalCount: 0,
+    totalTada: 0,
+    totalExpense: 0,
+    totalTravelExpenses: 0,
+    totalReceivedAmount: 0,
+    totalAmountToGive: 0,
+  };
+  const atlantaTotalExpense =
+    (atlantaAgg.totalTada || 0) + (atlantaAgg.totalExpense || 0) + (atlantaAgg.totalTravelExpenses || 0);
+
+  return {
+    quotations: {
+      totalCount: quotationTotalCount,
+      totalAmount: Math.round(quotationTotalAmount),
+      byStatus: quotationByStatus,
+      recent: recentQuotations.map((q) => ({
+        _id: q._id,
+        quotationNo: q.quotationNo,
+        quotationDate: q.quotationDate,
+        partyName: q.party?.name || '—',
+        companyName: q.company?.name || '—',
+        totalAmount: q.totalAmount || 0,
+        status: q.status || 'draft',
+      })),
+    },
+    proformaInvoices: {
+      totalCount: piAgg.totalCount || 0,
+      totalNetAmount: Math.round(piAgg.totalNetAmount || 0),
+      totalExGst: Math.round(piAgg.totalExGst || 0),
+      totalGstAmount: Math.round(piAgg.totalGstAmount || 0),
+      recent: recentPis.map((pi) => ({
+        _id: pi._id,
+        piNumber: pi.piNumber,
+        piDate: pi.piDate,
+        partyName: pi.party?.name || '—',
+        companyName: pi.company?.name || pi.companyCode || '—',
+        quotationNo: pi.quotation?.quotationNo || '—',
+        netAmount: pi.netAmount || pi.totalAmount || 0,
+      })),
+    },
+    deliveryChallans: {
+      totalCount: dcTotalCount,
+      totalValue: Math.round(dcTotalValue),
+      bySeller: dcBySeller,
+      recent: recentDcs.map((dc) => ({
+        _id: dc._id,
+        dcNumber: dc.dcNumber,
+        dcDate: dc.dcDate,
+        sellerCompany: dc.sellerCompany || 'notofire',
+        recipientName: dc.recipient?.name || dc.receiverName || '—',
+        placeOfSupply: dc.placeOfSupply || '—',
+        totalValue: dc.totalValue || 0,
+      })),
+    },
+    atlantaPayments: {
+      totalCount: atlantaAgg.totalCount || 0,
+      totalExpense: Math.round(atlantaTotalExpense),
+      totalReceivedAmount: Math.round(atlantaAgg.totalReceivedAmount || 0),
+      totalAmountToGive: Math.round(atlantaAgg.totalAmountToGive || 0),
+      recent: recentAtlanta.map((ap) => ({
+        _id: ap._id,
+        fileName: ap.fileName,
+        consigneeName: ap.consigneeName || '—',
+        employeeName: ap.employeeName || '—',
+        designation: ap.designation || '',
+        paymentDate: ap.paymentDate,
+        grandExpense: (ap.totalTada || 0) + (ap.totalExpense || 0) + (ap.totalTravelExpenses || 0),
+        totalReceivedAmount: ap.totalReceivedAmount || 0,
+        amountToGive: ap.amountToGive || 0,
+      })),
+    },
+  };
+}
+
 module.exports = {
   getStats,
   getProjectProgress,
@@ -607,4 +807,5 @@ module.exports = {
   getRecentReports,
   getRecentActivity,
   getMaterialStatusOverview,
+  getModulesOverview,
 };

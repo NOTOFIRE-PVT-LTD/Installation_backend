@@ -30,9 +30,10 @@ async function list(query, scope = {}) {
   const { page, pageSize, skip } = buildPagination(query);
   const sort = buildSort(query, SORTABLE, { srNo: -1 });
 
-  const filter = {};
+  const isTrashView = !scope.ownerId && query.trash === 'true';
+  const filter = { isDeleted: isTrashView ? true : { $ne: true } };
   if (scope.ownerId) filter.requestedBy = scope.ownerId;
-  if (query.status && PAYMENT_REQUEST_STATUSES.includes(query.status)) filter.status = query.status;
+  if (!isTrashView && query.status && PAYMENT_REQUEST_STATUSES.includes(query.status)) filter.status = query.status;
   if (query.search) {
     const regex = new RegExp(escapeRegex(query.search), 'i');
     const or = SEARCHABLE.map((field) => ({ [field]: regex }));
@@ -40,11 +41,12 @@ async function list(query, scope = {}) {
     filter.$or = or;
   }
 
-  const [items, total] = await Promise.all([
+  const [items, total, trashCount] = await Promise.all([
     PayflowPaymentRequest.find(filter).sort(sort).skip(skip).limit(pageSize).populate(populateUser).exec(),
     PayflowPaymentRequest.countDocuments(filter),
+    scope.ownerId ? Promise.resolve(0) : PayflowPaymentRequest.countDocuments({ isDeleted: true }),
   ]);
-  return buildPaginatedResult({ items, total, page, pageSize });
+  return { ...buildPaginatedResult({ items, total, page, pageSize }), trashCount };
 }
 
 async function getById(id, scope = {}) {
@@ -65,7 +67,7 @@ async function getById(id, scope = {}) {
 
   if (
     scope.ownerId &&
-    String(doc.requestedBy?._id || doc.requestedBy) !== String(scope.ownerId)
+    (doc.isDeleted || String(doc.requestedBy?._id || doc.requestedBy) !== String(scope.ownerId))
   ) {
     throw new ApiError(404, 'Payment request not found');
   }
@@ -158,6 +160,7 @@ async function create(body, actor) {
 async function changeStatus(id, { status, remark }, actor) {
   const doc = await PayflowPaymentRequest.findById(id);
   if (!doc) throw new ApiError(404, 'Payment request not found');
+  if (doc.isDeleted) throw new ApiError(400, 'Restore the payment request from trash before changing its status');
 
   const allowed = STATUS_TRANSITIONS[doc.status] || [];
   if (!allowed.includes(status)) {
@@ -174,6 +177,43 @@ async function changeStatus(id, { status, remark }, actor) {
   return getById(doc._id);
 }
 
+async function moveToTrash(id, actor) {
+  const doc = await PayflowPaymentRequest.findById(id);
+  if (!doc) throw new ApiError(404, 'Payment request not found');
+  if (doc.isDeleted) return getById(doc._id);
+
+  doc.isDeleted = true;
+  doc.deletedAt = new Date();
+  doc.deletedBy = actor._id;
+  doc.updatedBy = actor._id;
+  doc.history.push({ from: doc.status, to: doc.status, remark: 'Moved to trash', by: actor._id });
+  await doc.save();
+  return getById(doc._id);
+}
+
+async function restoreFromTrash(id, actor) {
+  const doc = await PayflowPaymentRequest.findById(id);
+  if (!doc) throw new ApiError(404, 'Payment request not found');
+  if (!doc.isDeleted) return getById(doc._id);
+
+  doc.isDeleted = false;
+  doc.deletedAt = null;
+  doc.deletedBy = null;
+  doc.updatedBy = actor._id;
+  doc.history.push({ from: doc.status, to: doc.status, remark: 'Restored from trash', by: actor._id });
+  await doc.save();
+  return getById(doc._id);
+}
+
+async function deletePermanently(id) {
+  const doc = await PayflowPaymentRequest.findById(id);
+  if (!doc) throw new ApiError(404, 'Payment request not found');
+  if (!doc.isDeleted) {
+    throw new ApiError(400, 'Move the payment request to trash before deleting permanently');
+  }
+  await PayflowPaymentRequest.findByIdAndDelete(id);
+}
+
 async function addFund({ amount, note }, actor) {
   await PayflowFund.create({ amount, note, addedBy: actor._id });
   return stats();
@@ -186,13 +226,17 @@ async function stats() {
   periodStart.setDate(periodStart.getDate() - 1);
   periodStart.setHours(0, 0, 0, 0);
 
-  const [byStatus, fundAgg, paymentAgg] = await Promise.all([
-    PayflowPaymentRequest.aggregate([{ $group: { _id: '$status', count: { $sum: 1 }, amount: { $sum: '$amount' } } }]),
+  const [byStatus, fundAgg, paymentAgg, trashCount] = await Promise.all([
+    PayflowPaymentRequest.aggregate([
+      { $match: { isDeleted: { $ne: true } } },
+      { $group: { _id: '$status', count: { $sum: 1 }, amount: { $sum: '$amount' } } },
+    ]),
     PayflowFund.aggregate([{ $group: { _id: null, total: { $sum: '$amount' } } }]),
     PayflowPaymentRequest.aggregate([
-      { $match: { status: { $in: ['Approved', 'Processed'] }, requestDate: { $gte: periodStart, $lte: periodEnd } } },
+      { $match: { isDeleted: { $ne: true }, status: { $in: ['Approved', 'Processed'] }, requestDate: { $gte: periodStart, $lte: periodEnd } } },
       { $group: { _id: null, total: { $sum: '$amount' } } },
     ]),
+    PayflowPaymentRequest.countDocuments({ isDeleted: true }),
   ]);
   const get = (s) => byStatus.find((r) => r._id === s) || { count: 0, amount: 0 };
   const totalRequests = byStatus.reduce((sum, r) => sum + r.count, 0);
@@ -208,6 +252,7 @@ async function stats() {
     rejected: get('Rejected').count,
     postponed: get('Postponed').count,
     query: get('Query').count,
+    trashCount,
     totalFund,
     totalPayments,
     netAvailable: totalFund - totalPayments,
@@ -221,7 +266,7 @@ const csvList = (v) => (v ? String(v).split(',').map((s) => s.trim()).filter(Boo
 
 // startDate / endDate are inclusive calendar days; statuses / companies are comma separated.
 function buildExportFilter(query, { withStatus = true } = {}) {
-  const filter = {};
+  const filter = { isDeleted: { $ne: true } };
   const range = {};
   if (query.startDate) {
     const start = new Date(query.startDate);
@@ -422,4 +467,18 @@ async function exportWorkbook(query) {
   return wb.xlsx.writeBuffer();
 }
 
-module.exports = { list, getById, userOptions, create, changeStatus, stats, addFund, exportSummary, exportWorkbook, STATUS_TRANSITIONS };
+module.exports = {
+  list,
+  getById,
+  userOptions,
+  create,
+  changeStatus,
+  moveToTrash,
+  restoreFromTrash,
+  deletePermanently,
+  stats,
+  addFund,
+  exportSummary,
+  exportWorkbook,
+  STATUS_TRANSITIONS,
+};

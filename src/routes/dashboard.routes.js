@@ -16,5 +16,6 @@ router.get('/material-status', dashboardController.materialStatusOverview);
 router.get('/daily-feed', dashboardController.dailyFeed);
 router.get('/recent-reports', dashboardController.recentReports);
 router.get('/recent-activity', dashboardController.recentActivity);
+router.get('/modules-overview', dashboardController.modulesOverview);
 
 module.exports = router;

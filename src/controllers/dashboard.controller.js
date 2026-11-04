@@ -37,6 +37,11 @@ const materialStatusOverview = asyncHandler(async (req, res) => {
   sendSuccess(res, { message: 'Material status overview fetched', data });
 });
 
+const modulesOverview = asyncHandler(async (req, res) => {
+  const data = await dashboardService.getModulesOverview(req.user);
+  sendSuccess(res, { message: 'Modules overview fetched', data });
+});
+
 module.exports = {
   stats,
   projectProgress,
@@ -45,4 +50,5 @@ module.exports = {
   recentReports,
   recentActivity,
   materialStatusOverview,
+  modulesOverview,
 };
