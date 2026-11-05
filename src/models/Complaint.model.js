@@ -109,6 +109,8 @@ const complaintSchema = new Schema(
     customerId: { type: Schema.Types.ObjectId, ref: 'Customer', default: null },
     customerName: { type: String, required: true, trim: true },
     contactNumber: { type: String, required: true, trim: true },
+    // WhatsApp number for ticket create / assign / resolve updates (SMS removed).
+    whatsappNumber: { type: String, trim: true, default: '' },
     email: { type: String, trim: true, lowercase: true, default: '' },
     companyName: { type: String, trim: true, default: '' },
     customerOrganization: { type: String, trim: true, default: '' },
@@ -183,7 +185,7 @@ const complaintSchema = new Schema(
     deliveryStatus: { type: String, trim: true, default: '' },
     notifyChannel: {
       type: String,
-      enum: ['whatsapp', 'sms', 'both'],
+      enum: ['whatsapp'],
       default: 'whatsapp',
     },
 

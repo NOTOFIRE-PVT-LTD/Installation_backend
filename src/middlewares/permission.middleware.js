@@ -1,6 +1,6 @@
 const ApiError = require('../utils/ApiError');
 const { ROLES, ADMIN_TYPES } = require('../config/constants');
-const { isSuperAdmin } = require('../utils/roles');
+const { isSuperAdmin, adminHasPermission } = require('../utils/roles');
 
 function checkSuperAdmin(user) {
   if (!user) return false;
@@ -25,19 +25,7 @@ function requirePermission(key) {
       return next(new ApiError(403, 'You do not have permission to perform this action'));
     }
 
-    const permissions = req.user.permissions;
-    if (!permissions) {
-      return next(new ApiError(403, `You do not have the "${key}" permission`));
-    }
-    const stored = permissions._doc || permissions;
-
-    // Salesperson tracking umbrella covers customers, attendance, and users/staff creation for tracking admins
-    if ((key === 'customers' || key === 'attendance') && stored.salespersonTracking) {
-      return next();
-    }
-
-    // Missing flag = newly added module; only an explicit false in Mongo blocks.
-    if (stored[key] === false) {
+    if (!adminHasPermission(req.user, key)) {
       return next(new ApiError(403, `You do not have the "${key}" permission`));
     }
 
@@ -65,25 +53,10 @@ function requirePermissionOrRole(key, ...allowedRoles) {
       return next();
     }
 
-    const permissions = req.user.permissions;
-    if (!permissions) {
+    if (!adminHasPermission(req.user, key)) {
       return next(new ApiError(403, `You do not have the "${key}" permission`));
     }
-    const stored = permissions._doc || permissions;
 
-    // Salesperson tracking umbrella covers customers and attendance for admins
-    if ((key === 'customers' || key === 'attendance') && stored.salespersonTracking) {
-      return next();
-    }
-
-    // Complaint coordinators and staff need customer lookup to register complaints
-    if (key === 'customers' && stored.complaints) {
-      return next();
-    }
-
-    if (stored[key] === false) {
-      return next(new ApiError(403, `You do not have the "${key}" permission`));
-    }
     next();
   };
 }
@@ -93,6 +66,13 @@ function requireExplicitPermission(key) {
     if (!req.user) return next(new ApiError(401, 'Authentication required'));
 
     if (checkSuperAdmin(req.user)) {
+      return next();
+    }
+
+    if (req.user.role === ROLES.ADMIN) {
+      if (!adminHasPermission(req.user, key)) {
+        return next(new ApiError(403, `You do not have the "${key}" permission`));
+      }
       return next();
     }
 
