@@ -89,3 +89,4 @@ async function generateContractorTemplate(res) {
 }
 
 module.exports = { generateContractorTemplate };
+
