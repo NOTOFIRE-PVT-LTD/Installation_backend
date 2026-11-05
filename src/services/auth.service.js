@@ -6,6 +6,8 @@ const permissionService = require('./permission.service');
 const ApiError = require('../utils/ApiError');
 const env = require('../config/env');
 const { USER_STATUS } = require('../config/constants');
+const { rejectIfPasswordReused } = require('../utils/passwordReuse');
+const { consumeCentralSsoCode } = require('../utils/centralSso');
 
 async function issueTokenPair(user, meta = {}) {
   const accessToken = tokenService.signAccessToken(user);
@@ -36,6 +38,31 @@ async function login({ email, password }, meta) {
 
   const { accessToken, refreshToken } = await issueTokenPair(user, meta);
 
+  return {
+    user: user.toSafeObject(),
+    permissions: permissionService.serializePermissions(user),
+    accessToken,
+    refreshToken,
+  };
+}
+
+/** Centralisation SSO — no password; code already proved identity at the portal. */
+async function loginWithCentralSso(code, meta) {
+  const claims = consumeCentralSsoCode(code, 'workspace');
+  if (!claims) throw new ApiError(401, 'Invalid or expired SSO code');
+
+  const user = await userRepository.findByEmailWithPassword(claims.email);
+  if (!user) {
+    throw new ApiError(
+      403,
+      'No Workspace account for this email. Create the user in VALUECON first.',
+    );
+  }
+  if (user.status === USER_STATUS.INACTIVE) {
+    throw new ApiError(403, 'Your account has been deactivated. Contact an administrator.');
+  }
+
+  const { accessToken, refreshToken } = await issueTokenPair(user, meta);
   return {
     user: user.toSafeObject(),
     permissions: permissionService.serializePermissions(user),
@@ -121,10 +148,12 @@ async function resetPassword(rawToken, newPassword) {
   const user = await userRepository.findByResetToken(hashedToken);
   if (!user) throw new ApiError(400, 'Reset token is invalid or has expired');
 
+  await rejectIfPasswordReused(user, newPassword);
+
   user.password = newPassword;
   user.resetPasswordToken = null;
   user.resetPasswordExpires = null;
-  await user.save();
+  await user.save({ validateModifiedOnly: true });
 
   await refreshTokenRepository.revokeAllForUser(user._id);
   await emailService.sendPasswordChangedEmail(user);
@@ -137,8 +166,10 @@ async function changePassword(userId, currentPassword, newPassword) {
   const isMatch = await user.comparePassword(currentPassword);
   if (!isMatch) throw new ApiError(400, 'Current password is incorrect');
 
+  await rejectIfPasswordReused(user, newPassword);
+
   user.password = newPassword;
-  await user.save();
+  await user.save({ validateModifiedOnly: true });
 
   await refreshTokenRepository.revokeAllForUser(user._id);
   await emailService.sendPasswordChangedEmail(user);
@@ -155,6 +186,7 @@ async function getMe(userId) {
 
 module.exports = {
   login,
+  loginWithCentralSso,
   refresh,
   logout,
   forgotPassword,

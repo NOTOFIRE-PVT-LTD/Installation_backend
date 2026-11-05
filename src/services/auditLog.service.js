@@ -3,6 +3,19 @@ const AuditLog = require('../models/AuditLog.model');
 const ApiError = require('../utils/ApiError');
 const { buildPagination, buildPaginatedResult } = require('../utils/pagination');
 
+const APP_ENDPOINT_PATTERNS = {
+  complaints: /^\/api\/complaints/,
+  attendance: /^\/api\/(attendance|visits|visit-expenses|leaves|people|customers)/,
+  projects: /^\/api\/(projects|reports|payments|stock|bom|item-master|uploads)/,
+  tenders: /^\/api\/(tenders|nit-tenders|cad\/|whatsapp)/,
+  billing: /^\/api\/(billing|quotations|proforma-invoices|delivery-challans)/,
+  financialDocuments: /^\/api\/(financial-documents|contract-agreements|call-letters)/,
+  inspections: /^\/api\/inspections/,
+  accounts: /^\/api\/(accounts|bg-applications)/,
+  atlantaPayments: /^\/api\/atlanta-payments/,
+  users: /^\/api\/(users|auth\/login|auth\/logout|auth\/change-password|auth\/reset-password|numbers)/,
+};
+
 function escapeRegex(text) {
   return String(text).replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
 }
@@ -15,6 +28,7 @@ async function recordLog(data = {}) {
     return await auditLogRepository.create({
       action: data.action,
       module: data.module || 'System',
+      app: data.app || '',
       description: data.description || 'Action performed',
       user: data.user || null,
       userName: data.userName || 'System',
@@ -62,6 +76,12 @@ async function listLogs(query = {}) {
         ],
       });
     });
+  }
+
+  // App filter (new records store `app`; older rows match by endpoint)
+  if (query.app && query.app !== 'ALL') {
+    const rx = APP_ENDPOINT_PATTERNS[query.app];
+    andClauses.push(rx ? { $or: [{ app: query.app }, { endpoint: rx }] } : { app: query.app });
   }
 
   // Module filter

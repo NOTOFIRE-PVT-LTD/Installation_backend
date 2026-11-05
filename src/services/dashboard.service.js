@@ -1,11 +1,15 @@
 const Project = require('../models/Project.model');
 const Report = require('../models/Report.model');
 const Payment = require('../models/Payment.model');
+const User = require('../models/User.model');
+const Customer = require('../models/Customer.model');
+const Attendance = require('../models/Attendance.model');
 const Quotation = require('../models/Quotation.model');
 const ProformaInvoice = require('../models/ProformaInvoice.model');
 const DeliveryChallan = require('../models/DeliveryChallan.model');
 const AtlantaPayment = require('../models/AtlantaPayment.model');
-const { REPORT_STATUS, PAYMENT_STATUS, CLAIM_STATUS, ROLES } = require('../config/constants');
+const { REPORT_STATUS, PAYMENT_STATUS, CLAIM_STATUS, ROLES, USER_STATUS, JOB_ROLES } = require('../config/constants');
+const { kolkataToday } = require('../utils/kolkataDate');
 
 function projectScopeFilter(user) {
   if (user?.role === ROLES.USER) {
@@ -51,13 +55,18 @@ function projectWorkDonePct(stations = []) {
 
 async function getStats(user) {
   const scope = projectScopeFilter(user);
-  const [totalProjects, pendingReports, verifiedReports, pendingPayments, projects, paidAgg] = await Promise.all([
+  const today = kolkataToday();
+  const [totalProjects, pendingReports, verifiedReports, pendingPayments, projects, paidAgg, fieldCustomers, fieldSalespeople, fieldPunchedIn, fieldPunchedOut] = await Promise.all([
     Project.countDocuments(scope),
     Report.countDocuments({ status: REPORT_STATUS.PENDING }),
     Report.countDocuments({ status: REPORT_STATUS.VERIFIED }),
     Payment.countDocuments({ status: PAYMENT_STATUS.PENDING }),
     Project.find(scope, 'stations targetDate'),
     Payment.aggregate([{ $match: { status: PAYMENT_STATUS.PAID } }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
+    Customer.countDocuments({ active: true }),
+    User.countDocuments({ role: ROLES.USER, jobRole: JOB_ROLES.SALESPERSON, status: USER_STATUS.ACTIVE }),
+    Attendance.countDocuments({ attendanceDate: today }),
+    Attendance.countDocuments({ attendanceDate: today, status: Attendance.ATTENDANCE_STATUS.CLOSED }),
   ]);
 
   const allStations = projects.flatMap((p) => p.stations || []);
@@ -98,6 +107,10 @@ async function getStats(user) {
     delayFlags,
     totalClaimed,
     bonusAwarded,
+    fieldCustomers,
+    fieldSalespeople,
+    fieldPunchedIn,
+    fieldPunchedOut,
   };
 }
 
@@ -329,14 +342,14 @@ function buildProjectMaterialChart(project) {
       category: 'Stations',
       status: 'completed',
       value: stationsCompleted,
-      color: '#0f766e',
+      color: '#8C591D',
     },
     {
       name: 'Stations not completed',
       category: 'Stations',
       status: 'notCompleted',
       value: stationsNotCompleted,
-      color: '#f59e0b',
+      color: '#FBE7A1',
     },
   ].filter((slice) => slice.value > 0);
 

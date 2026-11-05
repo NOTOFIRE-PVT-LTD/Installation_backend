@@ -5,6 +5,10 @@ const env = require('./env');
 // Some routers/ISP resolvers refuse SRV lookups needed by mongodb+srv:// URIs.
 const DNS_FAILURE_CODES = new Set(['EREFUSED', 'ETIMEOUT', 'ESERVFAIL', 'ECONNREFUSED']);
 const FALLBACK_DNS_SERVERS = ['8.8.8.8', '1.1.1.1'];
+try {
+  dns.setServers(FALLBACK_DNS_SERVERS);
+  if (dns.promises?.setServers) dns.promises.setServers(FALLBACK_DNS_SERVERS);
+} catch (e) {}
 
 function isSrvLookupFailure(err) {
   return DNS_FAILURE_CODES.has(err?.code) && /query(Srv|Txt)/.test(`${err?.syscall || ''} ${err?.message || ''}`);

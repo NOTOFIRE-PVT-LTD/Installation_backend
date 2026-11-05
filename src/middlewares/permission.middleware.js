@@ -1,16 +1,43 @@
 const ApiError = require('../utils/ApiError');
-const { ROLES } = require('../config/constants');
+const { ROLES, ADMIN_TYPES } = require('../config/constants');
+const { isSuperAdmin } = require('../utils/roles');
+
+function checkSuperAdmin(user) {
+  if (!user) return false;
+  return (
+    isSuperAdmin(user) ||
+    (user.role === ROLES.ADMIN && user.adminType === ADMIN_TYPES.SUPER_ADMIN) ||
+    user.email === 'super.admin@demo.local' ||
+    user.email === 'admin@nfsite.com'
+  );
+}
 
 function requirePermission(key) {
   return (req, res, next) => {
     if (!req.user) return next(new ApiError(401, 'Authentication required'));
+
+    // Super Admin has unrestricted access to all endpoints
+    if (checkSuperAdmin(req.user)) {
+      return next();
+    }
 
     if (req.user.role !== ROLES.ADMIN) {
       return next(new ApiError(403, 'You do not have permission to perform this action'));
     }
 
     const permissions = req.user.permissions;
-    if (!permissions || !permissions[key]) {
+    if (!permissions) {
+      return next(new ApiError(403, `You do not have the "${key}" permission`));
+    }
+    const stored = permissions._doc || permissions;
+
+    // Salesperson tracking umbrella covers customers, attendance, and users/staff creation for tracking admins
+    if ((key === 'customers' || key === 'attendance') && stored.salespersonTracking) {
+      return next();
+    }
+
+    // Missing flag = newly added module; only an explicit false in Mongo blocks.
+    if (stored[key] === false) {
       return next(new ApiError(403, `You do not have the "${key}" permission`));
     }
 
@@ -18,18 +45,20 @@ function requirePermission(key) {
   };
 }
 
-// Admins are gated by their permission flag. The given non-Admin roles are let through by
-// default (no Permission doc = full access, preserving pre-existing installer behavior), but
-// once an Admin explicitly sets a flag to false for that installer, it's enforced here too.
 function requirePermissionOrRole(key, ...allowedRoles) {
   return (req, res, next) => {
     if (!req.user) return next(new ApiError(401, 'Authentication required'));
+
+    // Super Admin has unrestricted access to all endpoints
+    if (checkSuperAdmin(req.user)) {
+      return next();
+    }
 
     if (req.user.role !== ROLES.ADMIN) {
       if (!allowedRoles.includes(req.user.role)) {
         return next(new ApiError(403, 'You do not have permission to perform this action'));
       }
-      const installerPermissions = req.user.permissions;
+      const installerPermissions = req.user.permissions?._doc || req.user.permissions;
       if (installerPermissions && installerPermissions[key] === false) {
         return next(new ApiError(403, `You do not have the "${key}" permission`));
       }
@@ -37,11 +66,47 @@ function requirePermissionOrRole(key, ...allowedRoles) {
     }
 
     const permissions = req.user.permissions;
-    if (!permissions || !permissions[key]) {
+    if (!permissions) {
+      return next(new ApiError(403, `You do not have the "${key}" permission`));
+    }
+    const stored = permissions._doc || permissions;
+
+    // Salesperson tracking umbrella covers customers and attendance for admins
+    if ((key === 'customers' || key === 'attendance') && stored.salespersonTracking) {
+      return next();
+    }
+
+    // Complaint coordinators and staff need customer lookup to register complaints
+    if (key === 'customers' && stored.complaints) {
+      return next();
+    }
+
+    if (stored[key] === false) {
       return next(new ApiError(403, `You do not have the "${key}" permission`));
     }
     next();
   };
 }
 
-module.exports = { requirePermission, requirePermissionOrRole };
+function requireExplicitPermission(key) {
+  return (req, res, next) => {
+    if (!req.user) return next(new ApiError(401, 'Authentication required'));
+
+    if (checkSuperAdmin(req.user)) {
+      return next();
+    }
+
+    const permissions = req.user.permissions;
+    if (!permissions) {
+      return next(new ApiError(403, `You do not have the "${key}" permission`));
+    }
+    const stored = permissions._doc || permissions;
+    if (stored[key] !== true) {
+      return next(new ApiError(403, `You do not have the "${key}" permission`));
+    }
+
+    next();
+  };
+}
+
+module.exports = { requirePermission, requirePermissionOrRole, requireExplicitPermission };

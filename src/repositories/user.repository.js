@@ -1,9 +1,18 @@
 const BaseRepository = require('./base.repository');
 const User = require('../models/User.model');
+const { ROLES, USER_STATUS } = require('../config/constants');
 
 class UserRepository extends BaseRepository {
   constructor() {
     super(User);
+  }
+
+  findActiveAdminsWithPermissions() {
+    return this.model
+      .find({ role: ROLES.ADMIN, status: USER_STATUS.ACTIVE })
+      .select('name email adminType permissions')
+      .populate('permissions')
+      .sort({ name: 1 });
   }
 
   findByEmailWithPassword(email) {
