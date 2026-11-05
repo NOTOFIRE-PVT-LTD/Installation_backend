@@ -16,6 +16,7 @@ const INSTALLER_PERMISSION_KEYS = [
   'atlantaPaymentsOwnOnly',
   'shipping',
   'importControl',
+  'contractorAttendance',
 ];
 
 function serializePermissions(user) {
