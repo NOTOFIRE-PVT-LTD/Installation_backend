@@ -10,7 +10,12 @@ const ApiError = require('../utils/ApiError');
 const { buildPagination, buildSort, buildPaginatedResult } = require('../utils/pagination');
 const { haversineMeters, withinRadius, toCoord } = require('../utils/geo');
 const { travelKmBetween } = require('../utils/travelKm');
-const { assertTransition, assertMissedReason, isOpenVisitStatus } = require('../utils/visitStatus');
+const {
+  assertTransition,
+  assertMissedReason,
+  isOpenVisitStatus,
+  isVisitResolvedForDay,
+} = require('../utils/visitStatus');
 const { isSalesperson } = require('../utils/roles');
 const { kolkataToday } = require('../utils/kolkataDate');
 const env = require('../config/env');
@@ -399,6 +404,7 @@ async function checkOut(id, data, file, actor) {
     visitDurationMin: duration,
     travelKm,
     outcomeNotes: remark,
+    fieldClosed: true,
   });
 
   if (isOutOfRange && visit.status !== VISIT_STATUS.PENDING_APPROVAL) {
@@ -446,6 +452,7 @@ async function reportMissed(id, data, actor) {
     status: VISIT_STATUS.PENDING_APPROVAL,
     missedReason: reason,
     missedExplanation: explanation,
+    fieldClosed: true,
   });
   return getById(visit._id, actor);
 }
@@ -543,18 +550,14 @@ async function assertSequentialStart(visit, actor) {
   }
   const inProgress = queue.find(
     (row) =>
-      row.status === VISIT_STATUS.IN_PROGRESS ||
-      (row.status === VISIT_STATUS.PENDING_APPROVAL && row.checkInAt && !row.checkOutAt)
+      !isVisitResolvedForDay(row) &&
+      (row.status === VISIT_STATUS.IN_PROGRESS ||
+        (row.status === VISIT_STATUS.PENDING_APPROVAL && row.checkInAt && !row.checkOutAt))
   );
   if (inProgress && String(inProgress._id) !== String(visit._id)) {
     throw new ApiError(400, 'Finish the in-progress visit first');
   }
-  const next = queue.find(
-    (row) =>
-      row.status !== VISIT_STATUS.COMPLETED &&
-      row.status !== VISIT_STATUS.APPROVED_MISSED &&
-      !(row.status === VISIT_STATUS.PENDING_APPROVAL && row.checkOutAt)
-  );
+  const next = queue.find((row) => !isVisitResolvedForDay(row));
   if (next && String(next._id) !== String(visit._id)) {
     throw new ApiError(400, 'Complete visits in order');
   }
@@ -587,12 +590,7 @@ function decorateDay(day, visits, expense) {
   const selected = day?.visitIds?.length
     ? day.visitIds.map((id) => visits.find((v) => String(v._id) === String(id))).filter(Boolean)
     : [];
-  const completed = selected.filter(
-    (v) =>
-      v.status === VISIT_STATUS.COMPLETED ||
-      v.status === VISIT_STATUS.APPROVED_MISSED ||
-      (v.status === VISIT_STATUS.PENDING_APPROVAL && v.checkOutAt)
-  ).length;
+  const completed = selected.filter((v) => isVisitResolvedForDay(v)).length;
   const totalKm = selected.reduce((sum, v) => sum + (Number(v.travelKm) || 0), 0);
   return {
     date: day?.date || kolkataToday(),
@@ -651,13 +649,8 @@ async function submitDay(actor) {
   if (!day?.visitIds?.length) throw new ApiError(400, "Select today's visits first");
   if (day.status === DAY_VISIT_STATUS.SUBMITTED) throw new ApiError(400, 'Today is already submitted');
   const selected = await orderedDayVisits(actor._id, date, day.visitIds);
-  const unfinished = selected.filter(
-    (v) =>
-      v.status !== VISIT_STATUS.COMPLETED &&
-      v.status !== VISIT_STATUS.APPROVED_MISSED &&
-      !(v.status === VISIT_STATUS.PENDING_APPROVAL && v.checkOutAt)
-  );
-  if (unfinished.length) throw new ApiError(400, 'Complete every selected visit before submitting the day');
+  const unfinished = selected.filter((v) => !isVisitResolvedForDay(v));
+  if (unfinished.length) throw new ApiError(400, 'Complete or report every selected visit before submitting the day');
   await dailyVisitDayRepository.updateById(day._id, { status: DAY_VISIT_STATUS.SUBMITTED, submittedAt: new Date() });
   await ensureDraftExpense(actor._id, date, day, selected);
   return getDay({ date }, actor);
@@ -771,20 +764,17 @@ async function dailySummary(query, actor) {
     const exp = expenseByDate.get(date) || null;
     const day = dayByDate.get(date) || null;
 
-    const completed = dateVisits.filter(
-      (v) =>
-        v.status === VISIT_STATUS.COMPLETED ||
-        (v.status === VISIT_STATUS.PENDING_APPROVAL && v.checkOutAt)
-    ).length;
+    const completed = dateVisits.filter((v) => isVisitResolvedForDay(v) && v.checkOutAt).length;
     const missed = dateVisits.filter(
       (v) =>
         v.status === VISIT_STATUS.APPROVED_MISSED ||
-        (v.status === VISIT_STATUS.PENDING_APPROVAL && !v.checkInAt)
+        (isVisitResolvedForDay(v) && !v.checkOutAt)
     ).length;
     const inProgress = dateVisits.filter(
       (v) =>
-        v.status === VISIT_STATUS.IN_PROGRESS ||
-        (v.status === VISIT_STATUS.PENDING_APPROVAL && v.checkInAt && !v.checkOutAt)
+        !isVisitResolvedForDay(v) &&
+        (v.status === VISIT_STATUS.IN_PROGRESS ||
+          (v.status === VISIT_STATUS.PENDING_APPROVAL && v.checkInAt && !v.checkOutAt))
     ).length;
     const planned = dateVisits.filter((v) => v.status === VISIT_STATUS.PLANNED).length;
 

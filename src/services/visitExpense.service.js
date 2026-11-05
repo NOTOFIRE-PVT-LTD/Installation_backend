@@ -8,6 +8,7 @@ const {
   ROLES,
   DAY_VISIT_STATUS,
   VISIT_EXPENSE_STATUS,
+  VISIT_EXPENSE_CLAIM_MODE,
   TRANSPORT_MODE,
   PRIVATE_KM_RATE,
 } = require('../config/constants');
@@ -95,7 +96,24 @@ async function updateDraft(id, data, actor) {
   });
   const sums = totals(items);
   const gstAmount = data.gstAmount === undefined || data.gstAmount === '' ? expense.gstAmount || 0 : Math.max(0, Number(data.gstAmount) || 0);
-  await visitExpenseRepository.updateById(expense._id, { items, ...sums, gstAmount });
+  const claimModeRaw = String(data.claimMode || expense.claimMode || VISIT_EXPENSE_CLAIM_MODE.PER_VISIT).toUpperCase();
+  const claimMode = Object.values(VISIT_EXPENSE_CLAIM_MODE).includes(claimModeRaw)
+    ? claimModeRaw
+    : VISIT_EXPENSE_CLAIM_MODE.PER_VISIT;
+  const dayTotalAmount =
+    data.dayTotalAmount === undefined || data.dayTotalAmount === ''
+      ? Number(expense.dayTotalAmount) || 0
+      : Math.max(0, Number(data.dayTotalAmount) || 0);
+  const patch = {
+    items,
+    totalKm: sums.totalKm,
+    gstAmount,
+    claimMode,
+    dayTotalAmount,
+    totalAmount:
+      claimMode === VISIT_EXPENSE_CLAIM_MODE.DAY_TOTAL ? dayTotalAmount : sums.totalAmount,
+  };
+  await visitExpenseRepository.updateById(expense._id, patch);
   return getById(expense._id, actor);
 }
 

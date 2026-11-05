@@ -42,4 +42,20 @@ function isOpenVisitStatus(status) {
   );
 }
 
-module.exports = { ALLOWED, assertTransition, assertMissedReason, isOpenVisitStatus };
+/** Visit is done for today's salesperson queue (next visit / day submit / expenses). */
+function isVisitResolvedForDay(visit) {
+  if (!visit) return false;
+  if (visit.status === VISIT_STATUS.COMPLETED || visit.status === VISIT_STATUS.APPROVED_MISSED) return true;
+  if (visit.fieldClosed) return true;
+  // Legacy rows: checkout-with-exception counted as done before fieldClosed existed
+  if (visit.status === VISIT_STATUS.PENDING_APPROVAL && visit.checkOutAt) return true;
+  return false;
+}
+
+module.exports = {
+  ALLOWED,
+  assertTransition,
+  assertMissedReason,
+  isOpenVisitStatus,
+  isVisitResolvedForDay,
+};

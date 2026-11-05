@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { VISIT_EXPENSE_STATUS, TRANSPORT_MODE } = require('../config/constants');
+const { VISIT_EXPENSE_STATUS, VISIT_EXPENSE_CLAIM_MODE, TRANSPORT_MODE } = require('../config/constants');
 
 const { Schema } = mongoose;
 
@@ -23,6 +23,12 @@ const visitExpenseSchema = new Schema(
     date: { type: String, required: true, index: true },
     dailyVisitDay: { type: Schema.Types.ObjectId, ref: 'DailyVisitDay', default: null },
     items: { type: [expenseItemSchema], default: [] },
+    claimMode: {
+      type: String,
+      enum: Object.values(VISIT_EXPENSE_CLAIM_MODE),
+      default: VISIT_EXPENSE_CLAIM_MODE.PER_VISIT,
+    },
+    dayTotalAmount: { type: Number, default: 0 },
     totalKm: { type: Number, default: 0 },
     totalAmount: { type: Number, default: 0 },
     gstAmount: { type: Number, default: 0 },
