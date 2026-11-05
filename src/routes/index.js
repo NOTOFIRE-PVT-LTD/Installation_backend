@@ -37,12 +37,14 @@ const companionRoutes = require('./companion.routes');
 const centralRoutes = require('./central.routes');
 const shippingRoutes = require('./shipping.routes');
 const importControlRoutes = require('./importControl.routes');
+const contractorAttendanceRoutes = require('./contractorAttendance.routes');
 
 const router = express.Router();
 
 router.use('/central', centralRoutes);
 router.use('/shipping', shippingRoutes);
 router.use('/import-control', importControlRoutes);
+router.use('/contractor-attendance', contractorAttendanceRoutes);
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
 router.use('/people', peopleRoutes);

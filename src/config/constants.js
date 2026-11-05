@@ -186,6 +186,7 @@ const PERMISSION_KEYS = Object.freeze([
   'complaints',
   'shipping',
   'importControl',
+  'contractorAttendance',
 ]);
 
 const COMPLAINT_STATUS = Object.freeze({
