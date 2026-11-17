@@ -9,6 +9,8 @@ const { uploadProfileImage } = require('../middlewares/upload.middleware');
 const router = express.Router();
 
 router.post('/login', validate(authValidator.login), authController.login);
+router.post('/otp/request', authController.requestOtp);
+router.post('/otp/login', authController.loginWithOtp);
 router.post('/central-sso', authController.centralSso);
 router.post('/refresh', authController.refresh);
 router.post('/logout', authController.logout);

@@ -19,6 +19,21 @@ const login = asyncHandler(async (req, res) => {
   });
 });
 
+const requestOtp = asyncHandler(async (req, res) => {
+  const data = await authService.requestOtp(req.body.phone);
+  res.status(200).json({ ok: true, success: true, ...data });
+});
+
+const loginWithOtp = asyncHandler(async (req, res) => {
+  const { phone, code } = req.body;
+  const result = await authService.loginWithOtp({ phone, code }, getMeta(req));
+  setRefreshTokenCookie(res, result.refreshToken);
+  sendSuccess(res, {
+    message: 'Login successful',
+    data: { user: result.user, permissions: result.permissions, accessToken: result.accessToken },
+  });
+});
+
 const centralSso = asyncHandler(async (req, res) => {
   const { code } = req.body;
   const result = await authService.loginWithCentralSso(code, getMeta(req));
@@ -75,6 +90,8 @@ const updateProfile = asyncHandler(async (req, res) => {
 
 module.exports = {
   login,
+  requestOtp,
+  loginWithOtp,
   centralSso,
   refresh,
   logout,

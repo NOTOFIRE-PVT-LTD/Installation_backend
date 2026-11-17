@@ -216,8 +216,54 @@ async function getMe(userId) {
   };
 }
 
+async function requestOtp(phone) {
+  const { requestPnlOtp } = require('../utils/pnlOtpProxy');
+  const result = await requestPnlOtp(phone);
+  if (!result.ok) {
+    throw new ApiError(result.status || 400, result.body?.message || 'Could not send OTP');
+  }
+  return result.body;
+}
+
+async function loginWithOtp({ phone, code }, meta) {
+  const { verifyPnlOtp, findPnlUserByPhone } = require('../utils/pnlOtpProxy');
+  const User = require('../models/User.model');
+  const verified = await verifyPnlOtp(phone, code);
+  if (!verified.ok) throw new ApiError(401, 'Invalid or expired OTP');
+
+  const digits = String(phone || '').replace(/\D/g, '').slice(-10);
+  let user = await User.findOne({ mobileNumber: digits }).populate('permissions');
+  if (!user) {
+    const pnl = await findPnlUserByPhone(phone);
+    if (!pnl?.email) {
+      throw new ApiError(403, 'No account for this mobile number. Use email login or ask an admin.');
+    }
+    user = await ensureMongoUserFromPnl({
+      email: pnl.email,
+      name: pnl.name,
+      password: `otp-${digits}-${Date.now()}`,
+    });
+    if (user && digits) {
+      user.mobileNumber = digits;
+      await user.save({ validateModifiedOnly: true });
+    }
+  }
+  if (!user || user.status === USER_STATUS.INACTIVE) {
+    throw new ApiError(403, 'Your account has been deactivated. Contact an administrator.');
+  }
+  const { accessToken, refreshToken } = await issueTokenPair(user, meta);
+  return {
+    user: user.toSafeObject(),
+    permissions: permissionService.serializePermissions(user),
+    accessToken,
+    refreshToken,
+  };
+}
+
 module.exports = {
   login,
+  loginWithOtp,
+  requestOtp,
   loginWithCentralSso,
   refresh,
   logout,
