@@ -1,5 +1,5 @@
-# Auto-deploy Installation API to EC2 after push to dev.
-# Pulls code on the server and restarts PM2 (no Vite/Next build).
+# Auto-deploy Installation API to EC2 after push to dev or main.
+# Pulls the pushed branch on the server and restarts PM2 (no Vite/Next build).
 # Required repo secrets (Settings → Secrets → Actions):
 #   EC2_HOST       e.g. 13.201.19.145
 #   EC2_USER       e.g. ubuntu
@@ -10,7 +10,7 @@ name: Deploy backend to EC2
 
 on:
   push:
-    branches: [dev]
+    branches: [dev, main]
   workflow_dispatch:
 
 concurrency:
@@ -34,9 +34,10 @@ jobs:
             set -euo pipefail
             API_DIR="${{ secrets.EC2_API_DIR }}"
             API_DIR="${API_DIR:-/var/www/workspace-api}"
+            BRANCH="${{ github.ref_name }}"
             cd "$API_DIR"
-            git fetch origin dev
-            git reset --hard origin/dev
+            git fetch origin "$BRANCH"
+            git reset --hard "origin/$BRANCH"
             npm ci || npm install
             if pm2 describe workspace-api >/dev/null 2>&1; then
               pm2 restart workspace-api --update-env
@@ -44,4 +45,4 @@ jobs:
               pm2 start src/server.js --name workspace-api
             fi
             pm2 save
-            echo "Backend deploy OK $(git rev-parse --short HEAD)"
+            echo "Backend deploy OK $(git rev-parse --short HEAD) ($BRANCH)"
