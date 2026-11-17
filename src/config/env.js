@@ -1,7 +1,8 @@
 const path = require('path');
 const dotenv = require('dotenv');
 
-dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+// Installation_backend/.env (src/config → ../..)
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 dotenv.config();
 
 const required = ['MONGODB_URI', 'JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET', 'COOKIE_SECRET'];
