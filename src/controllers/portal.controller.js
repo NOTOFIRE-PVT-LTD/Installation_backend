@@ -8,7 +8,7 @@ const me = asyncHandler(async (req, res) => {
 });
 
 const openPnl = asyncHandler(async (req, res) => {
-  const data = await portalService.openPnlApp(req.user._id);
+  const data = portalService.openPnlApp(req.user);
   sendSuccess(res, { message: 'OK', data });
 });
 

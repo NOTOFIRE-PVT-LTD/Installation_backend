@@ -32,14 +32,16 @@ async function getPortalSession(userId) {
   };
 }
 
-async function openPnlApp(userId) {
-  const session = await getPortalSession(userId);
-  if (!session.access.pnl) {
-    throw new ApiError(403, 'No P&L access');
-  }
+/** Mint P&L SSO URL from the already-authenticated req.user (no extra DB read). */
+function openPnlApp(userDoc) {
+  const email = userDoc?.email;
+  if (!email) throw new ApiError(401, 'User inactive or missing');
+  if (userDoc.status === 'inactive') throw new ApiError(401, 'User inactive or missing');
+  const access = resolvePortalAccess(email);
+  if (!access.pnl) throw new ApiError(403, 'No P&L access');
   const code = mintCentralSsoCode({
-    email: session.user.email,
-    name: session.user.name,
+    email,
+    name: userDoc.name || null,
     app: 'pnl',
   });
   return {
