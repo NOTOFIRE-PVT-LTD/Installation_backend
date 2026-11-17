@@ -3,22 +3,28 @@ const { Pool } = require('pg');
 
 let pool;
 
+function pnlDbUrl() {
+  return process.env.PNL_DATABASE_URL || process.env.DATABASE_URL_PNL || '';
+}
+
 function getPool() {
-  const url = process.env.PNL_DATABASE_URL || process.env.DATABASE_URL_PNL;
+  const url = pnlDbUrl();
   if (!url) return null;
   if (!pool) {
+    // RDS often presents a chain that Node rejects; never verify CA for this fallback.
+    const clean = url
+      .replace(/[?&]sslmode=[^&]*/gi, '')
+      .replace(/[?&]$/, '');
+    const sep = clean.includes('?') ? '&' : '?';
     pool = new Pool({
-      connectionString: url,
-      ssl: url.includes('sslmode=require') ? { rejectUnauthorized: false } : undefined,
+      connectionString: `${clean}${sep}sslmode=no-verify`,
+      ssl: { rejectUnauthorized: false },
     });
   }
   return pool;
 }
 
-/**
- * Verify email/password against P&L Postgres (no P&L code change).
- * Returns { email, name } or null.
- */
+/** Verify email/password against P&L Postgres. Returns { email, name } or null. */
 async function verifyPnlPassword(email, password) {
   const db = getPool();
   if (!db || !email || !password) return null;

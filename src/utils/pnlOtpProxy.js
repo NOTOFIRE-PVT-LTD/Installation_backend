@@ -24,12 +24,14 @@ async function verifyPnlOtp(phone, code) {
 
 async function findPnlUserByPhone(phone) {
   const { Pool } = require('pg');
-  const url = process.env.PNL_DATABASE_URL || process.env.DATABASE_URL_PNL;
-  if (!url) return null;
+  const raw = process.env.PNL_DATABASE_URL || process.env.DATABASE_URL_PNL;
+  if (!raw) return null;
   const digits = String(phone || '').replace(/\D/g, '').slice(-10);
+  const clean = raw.replace(/[?&]sslmode=[^&]*/gi, '').replace(/[?&]$/, '');
+  const sep = clean.includes('?') ? '&' : '?';
   const pool = new Pool({
-    connectionString: url,
-    ssl: url.includes('sslmode=require') ? { rejectUnauthorized: false } : undefined,
+    connectionString: `${clean}${sep}sslmode=no-verify`,
+    ssl: { rejectUnauthorized: false },
   });
   try {
     const { rows } = await pool.query(
