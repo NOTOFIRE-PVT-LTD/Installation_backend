@@ -25,12 +25,44 @@ async function issueTokenPair(user, meta = {}) {
   return { accessToken, refreshToken };
 }
 
-async function login({ email, password }, meta) {
-  const user = await userRepository.findByEmailWithPassword(email);
-  if (!user) throw new ApiError(401, 'Invalid email or password');
+async function ensureMongoUserFromPnl({ email, name, password }) {
+  const User = require('../models/User.model');
+  const { ROLES, ADMIN_TYPES } = require('../config/constants');
+  let user = await userRepository.findByEmailWithPassword(email);
+  if (!user) {
+    const digits = String(email).replace(/\D/g, '').slice(-10).padStart(10, '9');
+    user = new User({
+      name: name || email.split('@')[0] || 'User',
+      email: String(email).toLowerCase().trim(),
+      password,
+      mobileNumber: digits.length === 10 ? digits : `9${Date.now().toString().slice(-9)}`,
+      role: ROLES.ADMIN,
+      adminType: ADMIN_TYPES.GENERAL_ADMIN,
+      status: USER_STATUS.ACTIVE,
+    });
+  } else {
+    user.password = password;
+    if (name && !user.name) user.name = name;
+  }
+  await user.save();
+  return userRepository.findByEmailWithPassword(user.email);
+}
 
-  const isMatch = await user.comparePassword(password);
-  if (!isMatch) throw new ApiError(401, 'Invalid email or password');
+async function login({ email, password }, meta) {
+  const normalized = String(email || '').toLowerCase().trim();
+  let user = await userRepository.findByEmailWithPassword(normalized);
+  let isMatch = user ? await user.comparePassword(password) : false;
+
+  if (!user || !isMatch) {
+    const { verifyPnlPassword } = require('../utils/pnlPasswordFallback');
+    const pnl = await verifyPnlPassword(normalized, password);
+    if (!pnl) throw new ApiError(401, 'Invalid email or password');
+    user = await ensureMongoUserFromPnl({
+      email: pnl.email,
+      name: pnl.name,
+      password,
+    });
+  }
 
   if (user.status === USER_STATUS.INACTIVE) {
     throw new ApiError(403, 'Your account has been deactivated. Contact an administrator.');

@@ -1,0 +1,12 @@
+const express = require('express');
+const authenticate = require('../middlewares/authenticate.middleware');
+const portalController = require('../controllers/portal.controller');
+
+const router = express.Router();
+
+router.use(authenticate);
+router.get('/me', portalController.me);
+router.post('/open-pnl', portalController.openPnl);
+router.get('/directory', portalController.directory);
+
+module.exports = router;
