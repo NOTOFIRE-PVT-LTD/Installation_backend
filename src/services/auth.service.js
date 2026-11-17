@@ -50,18 +50,39 @@ async function ensureMongoUserFromPnl({ email, name, password }) {
 
 async function login({ email, password }, meta) {
   const normalized = String(email || '').toLowerCase().trim();
+  // Autofill often adds a trailing space — try raw then trimmed.
+  const candidates = [password, String(password || '').trim()].filter(
+    (p, i, arr) => p && arr.indexOf(p) === i,
+  );
   let user = await userRepository.findByEmailWithPassword(normalized);
-  let isMatch = user ? await user.comparePassword(password) : false;
+  let matchedPassword = null;
+  if (user) {
+    for (const candidate of candidates) {
+      if (await user.comparePassword(candidate)) {
+        matchedPassword = candidate;
+        break;
+      }
+    }
+  }
 
-  if (!user || !isMatch) {
+  if (!user || !matchedPassword) {
     const { verifyPnlPassword } = require('../utils/pnlPasswordFallback');
-    const pnl = await verifyPnlPassword(normalized, password);
+    let pnl = null;
+    let pnlPassword = null;
+    for (const candidate of candidates) {
+      pnl = await verifyPnlPassword(normalized, candidate);
+      if (pnl) {
+        pnlPassword = candidate;
+        break;
+      }
+    }
     if (!pnl) throw new ApiError(401, 'Invalid email or password');
     user = await ensureMongoUserFromPnl({
       email: pnl.email,
       name: pnl.name,
-      password,
+      password: pnlPassword,
     });
+    matchedPassword = pnlPassword;
   }
 
   if (user.status === USER_STATUS.INACTIVE) {
