@@ -1,9 +1,9 @@
 {
-  "csvRecords": 4395,
-  "paymentGroupsMatched": 4090,
-  "billsAdded": 40,
-  "duplicateBillsSkipped": 4354,
-  "unmatchedBills": 0,
+  "csvRecords": 4436,
+  "paymentGroupsMatched": 4131,
+  "billsAdded": 42,
+  "duplicateBillsSkipped": 4392,
+  "unmatchedBills": 1,
   "invalidBills": 1,
   "failedBatches": 0,
   "errors": [
@@ -12,6 +12,11 @@
       "billId": "c250b214-a3d6-4856-8ec8-b42d8bfa16f0",
       "paymentId": "a79311f8-2f9c-49ed-b67f-50e26dfc866d",
       "error": "Invalid bill date: 0026-06-24 00:00:00+00"
+    },
+    {
+      "paymentId": "45256c68-4a39-49ed-8777-e7015e84afde",
+      "billCount": 1,
+      "error": "No MongoDB payment matched legacySupabaseId"
     }
   ]
 }

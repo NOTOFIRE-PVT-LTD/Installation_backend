@@ -1,10 +1,18 @@
 {
-  "csvRecords": 1968,
-  "uploaded": 19,
-  "alreadyUploaded": 1949,
-  "linked": 19,
-  "alreadyLinked": 1949,
-  "unmatchedPayments": 0,
-  "failed": 0,
-  "errors": []
+  "csvRecords": 1992,
+  "uploaded": 25,
+  "alreadyUploaded": 1966,
+  "linked": 25,
+  "alreadyLinked": 1966,
+  "unmatchedPayments": 1,
+  "failed": 1,
+  "errors": [
+    {
+      "row": 1993,
+      "sourceId": "61fce7ee-2be8-49dd-971c-86352e15a816",
+      "paymentId": "45256c68-4a39-49ed-8777-e7015e84afde",
+      "fileName": "INV-2627-S010.pdf",
+      "error": "No MongoDB payment matches Supabase ID 45256c68-4a39-49ed-8777-e7015e84afde"
+    }
+  ]
 }
