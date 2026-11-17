@@ -44,6 +44,7 @@ const salesTravelRequestRoutes = require('./salesTravelRequest.routes');
 const router = express.Router();
 
 router.use('/central', centralRoutes);
+router.use('/central/portal', require('./portal.routes'));
 router.use('/shipping', shippingRoutes);
 router.use('/import-control', importControlRoutes);
 router.use('/contractor-attendance', contractorAttendanceRoutes);
