@@ -1,7 +1,12 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const { VISIT_STATUS } = require('../config/constants');
-const { assertTransition, assertMissedReason, isOpenVisitStatus } = require('./visitStatus');
+const {
+  assertTransition,
+  assertMissedReason,
+  isOpenVisitStatus,
+  isVisitResolvedForDay,
+} = require('./visitStatus');
 
 describe('visitStatus', () => {
   it('allows planned → in progress → completed', () => {
@@ -24,5 +29,29 @@ describe('visitStatus', () => {
     assert.equal(isOpenVisitStatus(VISIT_STATUS.PLANNED), true);
     assert.equal(isOpenVisitStatus(VISIT_STATUS.COMPLETED), false);
     assert.equal(isOpenVisitStatus(VISIT_STATUS.APPROVED_MISSED), false);
+  });
+
+  it('closes the day queue after checkout or missed report', () => {
+    assert.equal(isVisitResolvedForDay({ status: VISIT_STATUS.COMPLETED }), true);
+    assert.equal(isVisitResolvedForDay({ status: VISIT_STATUS.APPROVED_MISSED }), true);
+    assert.equal(
+      isVisitResolvedForDay({ status: VISIT_STATUS.PENDING_APPROVAL, fieldClosed: true }),
+      true
+    );
+    assert.equal(
+      isVisitResolvedForDay({
+        status: VISIT_STATUS.PENDING_APPROVAL,
+        checkOutAt: new Date(),
+      }),
+      true
+    );
+    assert.equal(
+      isVisitResolvedForDay({
+        status: VISIT_STATUS.PENDING_APPROVAL,
+        checkInAt: new Date(),
+        fieldClosed: false,
+      }),
+      false
+    );
   });
 });

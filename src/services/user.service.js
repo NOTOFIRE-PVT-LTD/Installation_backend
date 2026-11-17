@@ -272,6 +272,11 @@ async function update(id, data, file, actorId) {
       await uploadService.deleteAsset(user.profileImage.publicId, 'image');
     }
     updates.profileImage = await uploadService.uploadImageBuffer(file.buffer);
+  } else if (data.removeProfileImage === 'true' || data.removeProfileImage === true) {
+    if (user.profileImage?.publicId) {
+      await uploadService.deleteAsset(user.profileImage.publicId, 'image');
+    }
+    updates.profileImage = { url: null, publicId: null };
   }
 
   await userRepository.updateById(id, updates);
@@ -381,6 +386,11 @@ async function updateOwnProfile(userId, data, file) {
       await uploadService.deleteAsset(user.profileImage.publicId, 'image');
     }
     updates.profileImage = await uploadService.uploadImageBuffer(file.buffer);
+  } else if (data.removeProfileImage === 'true' || data.removeProfileImage === true) {
+    if (user.profileImage?.publicId) {
+      await uploadService.deleteAsset(user.profileImage.publicId, 'image');
+    }
+    updates.profileImage = { url: null, publicId: null };
   }
 
   await userRepository.updateById(userId, updates);

@@ -42,6 +42,9 @@ const visitSchema = new Schema(
     outcomeNotes: { type: String, default: '', trim: true },
     missedReason: { type: String, default: null },
     missedExplanation: { type: String, default: '', trim: true },
+    // Salesperson finished this visit for today's queue (checkout or missed-report).
+    // Lets them move to the next visit / submit day while admin still reviews exceptions.
+    fieldClosed: { type: Boolean, default: false, index: true },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
   },
   { timestamps: true }

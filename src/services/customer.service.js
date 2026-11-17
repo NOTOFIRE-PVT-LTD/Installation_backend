@@ -11,7 +11,7 @@ const {
   normalizePhone,
 } = require('../utils/customerNormalize');
 
-const ALLOWED_SORT_FIELDS = ['companyName', 'city', 'gstin', 'createdAt'];
+const ALLOWED_SORT_FIELDS = ['companyName', 'contactPerson', 'city', 'state', 'address', 'gstin', 'createdAt'];
 const POPULATE = [
   { path: 'assignedSalesperson', select: 'name email mobileNumber' },
   { path: 'createdBy', select: 'name email' },
@@ -87,7 +87,16 @@ async function list(query, actor) {
   }
   if (query.search) {
     const regex = new RegExp(String(query.search).trim(), 'i');
-    filter.$or = [{ companyName: regex }, { contactPerson: regex }, { city: regex }, { gstin: regex }, { phone: regex }];
+    filter.$or = [
+      { companyName: regex },
+      { contactPerson: regex },
+      { address: regex },
+      { city: regex },
+      { state: regex },
+      { email: regex },
+      { gstin: regex },
+      { phone: regex },
+    ];
   }
 
   const { items, total } = await customerRepository.paginate({
@@ -116,10 +125,12 @@ async function getById(id, actor) {
 
 async function create(data, actorId) {
   const payload = buildPayload(data);
-  if (!payload.assignedSalesperson && actorId) {
-    payload.assignedSalesperson = actorId;
+  if (data.assignedSalesperson) {
+    payload.assignedSalesperson = data.assignedSalesperson;
+    await assertSalesperson(payload.assignedSalesperson);
+  } else {
+    payload.assignedSalesperson = null;
   }
-  await assertSalesperson(payload.assignedSalesperson);
 
   const matches = await duplicateHits(payload);
   if (matches.length && !data.confirmDuplicates) {

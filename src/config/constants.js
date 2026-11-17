@@ -42,6 +42,11 @@ const VISIT_EXPENSE_STATUS = Object.freeze({
   REJECTED: 'REJECTED',
 });
 
+const VISIT_EXPENSE_CLAIM_MODE = Object.freeze({
+  PER_VISIT: 'PER_VISIT',
+  DAY_TOTAL: 'DAY_TOTAL',
+});
+
 const TRANSPORT_MODE = Object.freeze({
   PRIVATE: 'PRIVATE',
   TRAIN: 'TRAIN',
@@ -181,6 +186,7 @@ const PERMISSION_KEYS = Object.freeze([
   'complaints',
   'shipping',
   'importControl',
+  'contractorAttendance',
 ]);
 
 const COMPLAINT_STATUS = Object.freeze({
@@ -347,6 +353,7 @@ module.exports = {
   VISIT_TYPE,
   DAY_VISIT_STATUS,
   VISIT_EXPENSE_STATUS,
+  VISIT_EXPENSE_CLAIM_MODE,
   TRANSPORT_MODE,
   PRIVATE_KM_RATE,
   VISIT_APPROVAL_DECISION,

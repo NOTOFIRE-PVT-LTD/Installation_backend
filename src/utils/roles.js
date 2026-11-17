@@ -10,7 +10,8 @@ const PLATFORM_OWNER_EMAILS = [
 // complaints/attendance admins — that mixed apps in the sidebar and landing path.
 const APP_PERMISSION_SETS = {
   complaints: ['complaints'],
-  attendance: ['attendance', 'salespersonTracking', 'customers'],
+  attendance: ['attendance', 'salespersonTracking', 'customers', 'contractorAttendance'],
+  contractorAttendance: ['contractorAttendance'],
   projects: ['projects', 'reports', 'cadDrawing', 'claimApprovals', 'dashboard'],
   tenders: ['tenders', 'tenderWhatsappAlerts', 'dashboard'],
   billing: ['billing', 'quotations', 'proformaInvoices', 'deliveryChallans'],

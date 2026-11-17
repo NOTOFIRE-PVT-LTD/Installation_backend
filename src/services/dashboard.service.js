@@ -1,3 +1,5 @@
+const { getStats, getProjectProgress } = require('./dashboard.getStatsAndgetProjectProgress');
+const { getProjectsOverview, getDailyFeed, getRecentReports, getRecentActivity, getMaterialStatusOverview } = require('./dashboard.getProjectsOverviewAndgetDailyFeedAndgetRecentReportsAndgetRecentActivityAndgetMaterialStatusOverview');
 const Project = require('../models/Project.model');
 const Report = require('../models/Report.model');
 const Payment = require('../models/Payment.model');
