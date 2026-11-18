@@ -129,6 +129,7 @@ const uploadQuotationProductFiles = upload.fields([
 
 const uploadDeliveryChallanFiles = upload.array('dcAttachments', 10);
 const uploadAtlantaPaymentProofs = upload.array('atlantaProofs', 50);
+const uploadSalesTravelProofs = upload.array('salesTravelProofs', 50);
 const uploadVisitPhoto = upload.single('photo');
 const uploadAttendancePhoto = upload.single('photo');
 const uploadExpenseTicket = upload.single('ticket');
@@ -143,7 +144,6 @@ const uploadComplaintPhotos = multer({
   },
   limits: { fileSize: env.upload.maxImageSizeMb * 1024 * 1024 },
 }).array('photos', 3);
-const uploadSalesTravelProofs = upload.array('salesTravelProofs', 50);
 
 module.exports = {
   uploadSalesTravelProofs,

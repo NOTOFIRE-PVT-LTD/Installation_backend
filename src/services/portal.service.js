@@ -2,6 +2,7 @@ const User = require('../models/User.model');
 const ApiError = require('../utils/ApiError');
 const { resolvePortalAccess, accessCount } = require('../utils/portalAccess');
 const { mintCentralSsoCode } = require('../utils/centralSso');
+const { listPnlDirectoryUsers } = require('../utils/pnlDirectory');
 
 function pnlPublicUrl() {
   return String(process.env.PNL_PUBLIC_URL || 'http://localhost:3000').replace(/\/$/, '');
@@ -15,6 +16,11 @@ function toPortalUser(user) {
     phone: user.mobileNumber || null,
     role: user.adminType || user.role || null,
   };
+}
+
+function roleLabel(adminType, role) {
+  if (adminType) return String(adminType).replace(/_/g, ' ');
+  return role || null;
 }
 
 async function getPortalSession(userId) {
@@ -49,20 +55,66 @@ function openPnlApp(userDoc) {
   };
 }
 
+function upsertDirectoryRow(map, row) {
+  const email = String(row.email || '').toLowerCase().trim();
+  if (!email) return;
+  const access = resolvePortalAccess(email);
+  if (!access.pnl && !access.workspace) return;
+
+  const existing = map.get(email);
+  const apps = new Set(existing?.apps || []);
+  if (access.workspace) apps.add('workspace');
+  if (access.pnl) apps.add('pnl');
+  if (!apps.size) return;
+
+  map.set(email, {
+    id: existing?.id || row.id,
+    workspaceId: access.workspace
+      ? row.workspaceId || existing?.workspaceId || null
+      : null,
+    name: row.name || existing?.name || null,
+    email,
+    phone: row.phone || existing?.phone || null,
+    role: row.role || existing?.role || null,
+    active: row.active !== false && (existing ? existing.active !== false : true),
+    apps: Array.from(apps),
+  });
+}
+
 async function listPortalDirectory() {
-  const users = await User.find({})
-    .select('name email mobileNumber role adminType status')
-    .sort({ name: 1 })
-    .lean();
-  return users.map((u) => ({
-    id: String(u._id),
-    name: u.name || null,
-    email: u.email,
-    phone: u.mobileNumber || null,
-    role: u.adminType || u.role || null,
-    active: u.status !== 'inactive',
-    app: 'workspace',
-  }));
+  const [wsUsers, pnlUsers] = await Promise.all([
+    User.find({}).select('name email mobileNumber role adminType status').sort({ name: 1 }).lean(),
+    listPnlDirectoryUsers(),
+  ]);
+
+  const byEmail = new Map();
+
+  wsUsers.forEach((u) => {
+    upsertDirectoryRow(byEmail, {
+      id: `ws-${u._id}`,
+      workspaceId: String(u._id),
+      email: u.email,
+      name: u.name || null,
+      phone: u.mobileNumber || null,
+      role: roleLabel(u.adminType, u.role),
+      active: u.status !== 'inactive',
+    });
+  });
+
+  pnlUsers.forEach((u) => {
+    upsertDirectoryRow(byEmail, {
+      id: `pnl-${u.id}`,
+      email: u.email,
+      name: u.name,
+      phone: u.phone,
+      role: u.role,
+      active: u.active,
+    });
+  });
+
+  return Array.from(byEmail.values()).sort((a, b) =>
+    String(a.name || a.email).localeCompare(String(b.name || b.email))
+  );
 }
 
 module.exports = {

@@ -12,13 +12,14 @@ const INSTALLER_PERMISSION_KEYS = [
   'reports',
 
   'cadDrawing',
-
   'customers',
   'attendance',
   'complaints',
   'atlantaPayments',
-
   'atlantaPaymentsOwnOnly',
+  'payflowUser',
+  'salesTravelRequests',
+  'salesTravelRequestsOwnOnly',
   'shipping',
   'importControl',
   'contractorAttendance',

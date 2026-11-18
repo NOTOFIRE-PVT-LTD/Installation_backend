@@ -1,0 +1,48 @@
+# Auto-deploy Installation API to EC2 after push to dev or main.
+# Pulls the pushed branch on the server and restarts PM2 (no Vite/Next build).
+# Required repo secrets (Settings → Secrets → Actions):
+#   EC2_HOST       e.g. 13.201.19.145
+#   EC2_USER       e.g. ubuntu
+#   EC2_SSH_KEY    full private key PEM contents
+#   EC2_API_DIR    e.g. /var/www/workspace-api  (optional; default below)
+
+name: Deploy backend to EC2
+
+on:
+  push:
+    branches: [dev, main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-installation-be-ec2
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script_stop: true
+          command_timeout: 12m
+          script: |
+            set -euo pipefail
+            API_DIR="${{ secrets.EC2_API_DIR }}"
+            API_DIR="${API_DIR:-/var/www/workspace-api}"
+            BRANCH="${{ github.ref_name }}"
+            cd "$API_DIR"
+            git fetch origin "$BRANCH"
+            git reset --hard "origin/$BRANCH"
+            npm ci || npm install
+            if pm2 describe workspace-api >/dev/null 2>&1; then
+              pm2 restart workspace-api --update-env
+            else
+              pm2 start src/server.js --name workspace-api
+            fi
+            pm2 save
+            echo "Backend deploy OK $(git rev-parse --short HEAD) ($BRANCH)"

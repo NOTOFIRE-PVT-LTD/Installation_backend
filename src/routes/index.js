@@ -32,14 +32,14 @@ const proformaInvoiceRoutes = require('./proformaInvoice.routes');
 const deliveryChallanRoutes = require('./deliveryChallan.routes');
 const atlantaPaymentRoutes = require('./atlantaPayment.routes');
 const auditLogRoutes = require('./auditLog.routes');
+const payflowRoutes = require('./payflow.routes');
+const salesTravelRequestRoutes = require('./salesTravelRequest.routes');
 const complaintRoutes = require('./complaint.routes');
 const companionRoutes = require('./companion.routes');
 const centralRoutes = require('./central.routes');
 const shippingRoutes = require('./shipping.routes');
 const importControlRoutes = require('./importControl.routes');
 const contractorAttendanceRoutes = require('./contractorAttendance.routes');
-const payflowRoutes = require('./payflow.routes');
-const salesTravelRequestRoutes = require('./salesTravelRequest.routes');
 
 const router = express.Router();
 
@@ -85,5 +85,7 @@ router.use('/complaints', complaintRoutes);
 router.use('/companion', companionRoutes);
 router.use('/payflow', payflowRoutes);
 router.use('/sales-travel-requests', salesTravelRequestRoutes);
+router.use('/complaints', complaintRoutes);
+router.use('/companion', companionRoutes);
 
 module.exports = router;

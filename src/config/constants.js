@@ -182,6 +182,12 @@ const PERMISSION_KEYS = Object.freeze([
   // Restricts an Atlanta payments user to their own payment records.
   'atlantaPaymentsOwnOnly',
   'auditLogs',
+  'payflow',
+  // Non-admin (User role) Payflow access: submit payment requests and view only their own.
+  'payflowUser',
+  'salesTravelRequests',
+  // Restricts a Sales Travel Request user to their own requests only.
+  'salesTravelRequestsOwnOnly',
   // Opt-in module: only admins explicitly granted this flag can open the complaint dashboard.
   'complaints',
   'shipping',

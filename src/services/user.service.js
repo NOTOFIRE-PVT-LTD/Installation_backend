@@ -2,6 +2,7 @@ const userRepository = require('../repositories/user.repository');
 const permissionRepository = require('../repositories/permission.repository');
 const refreshTokenRepository = require('../repositories/refreshToken.repository');
 const permissionService = require('./permission.service');
+const { resolvePortalAccess } = require('../utils/portalAccess');
 const authService = require('./auth.service');
 const emailService = require('./email.service');
 const uploadService = require('./upload.service');
@@ -103,9 +104,19 @@ async function list(query) {
     populate: 'permissions',
   });
 
+  // Workspace Users page: hide P&L-only accounts (no workspace grant).
+  let safeItems = items.map((u) => u.toSafeObject());
+  let safeTotal = total;
+  if (query.portalApp === 'workspace') {
+    safeItems = safeItems.filter((u) => resolvePortalAccess(u.email).workspace);
+    if (safeItems.length !== items.length) {
+      safeTotal = Math.max(0, total - (items.length - safeItems.length));
+    }
+  }
+
   return buildPaginatedResult({
-    items: items.map((u) => u.toSafeObject()),
-    total,
+    items: safeItems,
+    total: safeTotal,
     page,
     pageSize,
   });
