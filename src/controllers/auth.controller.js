@@ -19,6 +19,31 @@ const login = asyncHandler(async (req, res) => {
   });
 });
 
+const requestOtp = asyncHandler(async (req, res) => {
+  const data = await authService.requestOtp(req.body.phone);
+  res.status(200).json({ ok: true, success: true, ...data });
+});
+
+const loginWithOtp = asyncHandler(async (req, res) => {
+  const { phone, code } = req.body;
+  const result = await authService.loginWithOtp({ phone, code }, getMeta(req));
+  setRefreshTokenCookie(res, result.refreshToken);
+  sendSuccess(res, {
+    message: 'Login successful',
+    data: { user: result.user, permissions: result.permissions, accessToken: result.accessToken },
+  });
+});
+
+const centralSso = asyncHandler(async (req, res) => {
+  const { code } = req.body;
+  const result = await authService.loginWithCentralSso(code, getMeta(req));
+  setRefreshTokenCookie(res, result.refreshToken);
+  sendSuccess(res, {
+    message: 'SSO login successful',
+    data: { user: result.user, permissions: result.permissions, accessToken: result.accessToken },
+  });
+});
+
 const refresh = asyncHandler(async (req, res) => {
   const rawRefreshToken = req.cookies[env.cookie.refreshTokenName];
   const result = await authService.refresh(rawRefreshToken, getMeta(req));
@@ -63,4 +88,16 @@ const updateProfile = asyncHandler(async (req, res) => {
   sendSuccess(res, { message: 'Profile updated', data: user });
 });
 
-module.exports = { login, refresh, logout, me, forgotPassword, resetPassword, changePassword, updateProfile };
+module.exports = {
+  login,
+  requestOtp,
+  loginWithOtp,
+  centralSso,
+  refresh,
+  logout,
+  me,
+  forgotPassword,
+  resetPassword,
+  changePassword,
+  updateProfile,
+};

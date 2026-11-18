@@ -1,7 +1,12 @@
 const { body, param } = require('express-validator');
 
 const login = [
-  body('email').isEmail().withMessage('Valid email is required').normalizeEmail(),
+  // Do not normalizeEmail() — it rewrites Gmail addresses and can break login.
+  body('email')
+    .trim()
+    .toLowerCase()
+    .isEmail()
+    .withMessage('Valid email is required'),
   body('password').notEmpty().withMessage('Password is required'),
 ];
 

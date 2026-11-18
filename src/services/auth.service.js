@@ -6,6 +6,8 @@ const permissionService = require('./permission.service');
 const ApiError = require('../utils/ApiError');
 const env = require('../config/env');
 const { USER_STATUS } = require('../config/constants');
+const { rejectIfPasswordReused } = require('../utils/passwordReuse');
+const { consumeCentralSsoCode } = require('../utils/centralSso');
 
 async function issueTokenPair(user, meta = {}) {
   const accessToken = tokenService.signAccessToken(user);
@@ -23,12 +25,65 @@ async function issueTokenPair(user, meta = {}) {
   return { accessToken, refreshToken };
 }
 
-async function login({ email, password }, meta) {
-  const user = await userRepository.findByEmailWithPassword(email);
-  if (!user) throw new ApiError(401, 'Invalid email or password');
+async function ensureMongoUserFromPnl({ email, name, password }) {
+  const User = require('../models/User.model');
+  const { ROLES, ADMIN_TYPES } = require('../config/constants');
+  let user = await userRepository.findByEmailWithPassword(email);
+  if (!user) {
+    const digits = String(email).replace(/\D/g, '').slice(-10).padStart(10, '9');
+    user = new User({
+      name: name || email.split('@')[0] || 'User',
+      email: String(email).toLowerCase().trim(),
+      password,
+      mobileNumber: digits.length === 10 ? digits : `9${Date.now().toString().slice(-9)}`,
+      role: ROLES.ADMIN,
+      adminType: ADMIN_TYPES.GENERAL_ADMIN,
+      status: USER_STATUS.ACTIVE,
+    });
+  } else {
+    user.password = password;
+    if (name && !user.name) user.name = name;
+  }
+  await user.save();
+  return userRepository.findByEmailWithPassword(user.email);
+}
 
-  const isMatch = await user.comparePassword(password);
-  if (!isMatch) throw new ApiError(401, 'Invalid email or password');
+async function login({ email, password }, meta) {
+  const normalized = String(email || '').toLowerCase().trim();
+  // Autofill often adds a trailing space — try raw then trimmed.
+  const candidates = [password, String(password || '').trim()].filter(
+    (p, i, arr) => p && arr.indexOf(p) === i,
+  );
+  let user = await userRepository.findByEmailWithPassword(normalized);
+  let matchedPassword = null;
+  if (user) {
+    for (const candidate of candidates) {
+      if (await user.comparePassword(candidate)) {
+        matchedPassword = candidate;
+        break;
+      }
+    }
+  }
+
+  if (!user || !matchedPassword) {
+    const { verifyPnlPassword } = require('../utils/pnlPasswordFallback');
+    let pnl = null;
+    let pnlPassword = null;
+    for (const candidate of candidates) {
+      pnl = await verifyPnlPassword(normalized, candidate);
+      if (pnl) {
+        pnlPassword = candidate;
+        break;
+      }
+    }
+    if (!pnl) throw new ApiError(401, 'Invalid email or password');
+    user = await ensureMongoUserFromPnl({
+      email: pnl.email,
+      name: pnl.name,
+      password: pnlPassword,
+    });
+    matchedPassword = pnlPassword;
+  }
 
   if (user.status === USER_STATUS.INACTIVE) {
     throw new ApiError(403, 'Your account has been deactivated. Contact an administrator.');
@@ -36,6 +91,31 @@ async function login({ email, password }, meta) {
 
   const { accessToken, refreshToken } = await issueTokenPair(user, meta);
 
+  return {
+    user: user.toSafeObject(),
+    permissions: permissionService.serializePermissions(user),
+    accessToken,
+    refreshToken,
+  };
+}
+
+/** Centralisation SSO — no password; code already proved identity at the portal. */
+async function loginWithCentralSso(code, meta) {
+  const claims = consumeCentralSsoCode(code, 'workspace');
+  if (!claims) throw new ApiError(401, 'Invalid or expired SSO code');
+
+  const user = await userRepository.findByEmailWithPassword(claims.email);
+  if (!user) {
+    throw new ApiError(
+      403,
+      'No Workspace account for this email. Create the user in VALUECON first.',
+    );
+  }
+  if (user.status === USER_STATUS.INACTIVE) {
+    throw new ApiError(403, 'Your account has been deactivated. Contact an administrator.');
+  }
+
+  const { accessToken, refreshToken } = await issueTokenPair(user, meta);
   return {
     user: user.toSafeObject(),
     permissions: permissionService.serializePermissions(user),
@@ -121,10 +201,12 @@ async function resetPassword(rawToken, newPassword) {
   const user = await userRepository.findByResetToken(hashedToken);
   if (!user) throw new ApiError(400, 'Reset token is invalid or has expired');
 
+  await rejectIfPasswordReused(user, newPassword);
+
   user.password = newPassword;
   user.resetPasswordToken = null;
   user.resetPasswordExpires = null;
-  await user.save();
+  await user.save({ validateModifiedOnly: true });
 
   await refreshTokenRepository.revokeAllForUser(user._id);
   await emailService.sendPasswordChangedEmail(user);
@@ -137,8 +219,10 @@ async function changePassword(userId, currentPassword, newPassword) {
   const isMatch = await user.comparePassword(currentPassword);
   if (!isMatch) throw new ApiError(400, 'Current password is incorrect');
 
+  await rejectIfPasswordReused(user, newPassword);
+
   user.password = newPassword;
-  await user.save();
+  await user.save({ validateModifiedOnly: true });
 
   await refreshTokenRepository.revokeAllForUser(user._id);
   await emailService.sendPasswordChangedEmail(user);
@@ -153,8 +237,55 @@ async function getMe(userId) {
   };
 }
 
+async function requestOtp(phone) {
+  const { requestPnlOtp } = require('../utils/pnlOtpProxy');
+  const result = await requestPnlOtp(phone);
+  if (!result.ok) {
+    throw new ApiError(result.status || 400, result.body?.message || 'Could not send OTP');
+  }
+  return result.body;
+}
+
+async function loginWithOtp({ phone, code }, meta) {
+  const { verifyPnlOtp, findPnlUserByPhone } = require('../utils/pnlOtpProxy');
+  const User = require('../models/User.model');
+  const verified = await verifyPnlOtp(phone, code);
+  if (!verified.ok) throw new ApiError(401, 'Invalid or expired OTP');
+
+  const digits = String(phone || '').replace(/\D/g, '').slice(-10);
+  let user = await User.findOne({ mobileNumber: digits }).populate('permissions');
+  if (!user) {
+    const pnl = await findPnlUserByPhone(phone);
+    if (!pnl?.email) {
+      throw new ApiError(403, 'No account for this mobile number. Use email login or ask an admin.');
+    }
+    user = await ensureMongoUserFromPnl({
+      email: pnl.email,
+      name: pnl.name,
+      password: `otp-${digits}-${Date.now()}`,
+    });
+    if (user && digits) {
+      user.mobileNumber = digits;
+      await user.save({ validateModifiedOnly: true });
+    }
+  }
+  if (!user || user.status === USER_STATUS.INACTIVE) {
+    throw new ApiError(403, 'Your account has been deactivated. Contact an administrator.');
+  }
+  const { accessToken, refreshToken } = await issueTokenPair(user, meta);
+  return {
+    user: user.toSafeObject(),
+    permissions: permissionService.serializePermissions(user),
+    accessToken,
+    refreshToken,
+  };
+}
+
 module.exports = {
   login,
+  loginWithOtp,
+  requestOtp,
+  loginWithCentralSso,
   refresh,
   logout,
   forgotPassword,

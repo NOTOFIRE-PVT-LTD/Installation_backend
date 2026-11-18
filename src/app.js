@@ -23,6 +23,7 @@ function isAllowedOrigin(origin) {
     // Allow Vercel preview/production frontends when CLIENT_URL is misconfigured.
     if (hostname.endsWith('.vercel.app')) return true;
     if (hostname === 'localhost' || hostname === '127.0.0.1') return true;
+    if (/^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/.test(hostname)) return true;
   } catch {
     return false;
   }

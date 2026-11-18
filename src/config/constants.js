@@ -3,6 +3,121 @@ const ROLES = Object.freeze({
   USER: 'User',
 });
 
+const ADMIN_TYPES = Object.freeze({
+  SUPER_ADMIN: 'SUPER_ADMIN',
+  SALES_COORDINATOR: 'SALES_COORDINATOR',
+  TENDER_COORDINATOR: 'TENDER_COORDINATOR',
+  COMPLAINT_COORDINATOR: 'COMPLAINT_COORDINATOR',
+  GENERAL_ADMIN: 'GENERAL_ADMIN',
+});
+
+const JOB_ROLES = Object.freeze({
+  INSTALLER: 'INSTALLER',
+  SALESPERSON: 'SALESPERSON',
+});
+
+const VISIT_STATUS = Object.freeze({
+  PLANNED: 'PLANNED',
+  IN_PROGRESS: 'IN_PROGRESS',
+  COMPLETED: 'COMPLETED',
+  PENDING_APPROVAL: 'PENDING_APPROVAL',
+  APPROVED_MISSED: 'APPROVED_MISSED',
+  REJECTED: 'REJECTED',
+});
+
+const VISIT_TYPE = Object.freeze({
+  HOURLY: 'HOURLY',
+  TOUR: 'TOUR',
+});
+
+const DAY_VISIT_STATUS = Object.freeze({
+  DRAFT: 'DRAFT',
+  SUBMITTED: 'SUBMITTED',
+});
+
+const VISIT_EXPENSE_STATUS = Object.freeze({
+  DRAFT: 'DRAFT',
+  PENDING_APPROVAL: 'PENDING_APPROVAL',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+});
+
+const VISIT_EXPENSE_CLAIM_MODE = Object.freeze({
+  PER_VISIT: 'PER_VISIT',
+  DAY_TOTAL: 'DAY_TOTAL',
+});
+
+const TRANSPORT_MODE = Object.freeze({
+  PRIVATE: 'PRIVATE',
+  TRAIN: 'TRAIN',
+  METRO: 'METRO',
+  BUS: 'BUS',
+  TAXI: 'TAXI',
+  AUTO: 'AUTO',
+  OTHER: 'OTHER',
+});
+
+const PRIVATE_KM_RATE = 50;
+
+const VISIT_APPROVAL_DECISION = Object.freeze({
+  PENDING: 'PENDING',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+});
+
+const VISIT_EXCEPTION_KIND = Object.freeze({
+  MISSED: 'MISSED',
+  INCOMPLETE: 'INCOMPLETE',
+  OUT_OF_RANGE: 'OUT_OF_RANGE',
+});
+
+const MISSED_VISIT_REASONS = Object.freeze([
+  'Customer unavailable',
+  'Customer cancelled',
+  'Emergency',
+  'Vehicle/transport issue',
+  'Unable to reach location',
+  'Location/GPS problem',
+  'Customer requested reschedule',
+  'Outside location / Geofence exception',
+  'Other',
+]);
+
+const DEFAULT_VISIT_GEOFENCE_METERS = 100;
+
+const ATTENDANCE_CORRECTION_STATUS = Object.freeze({
+  PENDING: 'PENDING',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+});
+
+const ATTENDANCE_CORRECTION_KIND = Object.freeze({
+  MISSING_IN: 'MISSING_IN',
+  MISSING_OUT: 'MISSING_OUT',
+});
+
+const GENDER = Object.freeze({
+  MALE: 'MALE',
+  FEMALE: 'FEMALE',
+});
+
+// Office 10:00. Men off 19:00 (9h). Women off 18:30 (8h 30m).
+const ATTENDANCE_QUOTA_MIN = Object.freeze({
+  MALE: 9 * 60,
+  FEMALE: 8 * 60 + 30,
+});
+
+const LEAVE_PAY = Object.freeze({
+  PAID: 'PAID',
+  UNPAID: 'UNPAID',
+});
+
+const LEAVE_STATUS = Object.freeze({
+  PENDING: 'PENDING',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+});
+
 const USER_STATUS = Object.freeze({
   ACTIVE: 'active',
   INACTIVE: 'inactive',
@@ -39,6 +154,9 @@ const DEFAULT_BONUS_PERCENT = 5;
 const PERMISSION_KEYS = Object.freeze([
   'dashboard',
   'users',
+  'salespersonTracking',
+  'customers',
+  'attendance',
   'projects',
   'reports',
   'payments',
@@ -70,6 +188,51 @@ const PERMISSION_KEYS = Object.freeze([
   'salesTravelRequests',
   // Restricts a Sales Travel Request user to their own requests only.
   'salesTravelRequestsOwnOnly',
+  // Opt-in module: only admins explicitly granted this flag can open the complaint dashboard.
+  'complaints',
+  'shipping',
+  'importControl',
+  'contractorAttendance',
+]);
+
+const COMPLAINT_STATUS = Object.freeze({
+  OPEN: 'Open',
+  IN_PROGRESS: 'In Progress',
+  RESOLVED: 'Resolved',
+  CLOSED: 'Closed',
+});
+
+const COMPLAINT_PRIORITY = Object.freeze({
+  LOW: 'Low',
+  MEDIUM: 'Medium',
+  HIGH: 'High',
+  CRITICAL: 'Critical',
+});
+
+const COMPLAINT_CATEGORY = Object.freeze({
+  INSTALLATION: 'Installation',
+  PRODUCT_QUALITY: 'Product Quality',
+  SERVICE_DELAY: 'Service Delay',
+  BILLING: 'Billing',
+  OTHER: 'Other',
+});
+
+const COMPLAINT_SOURCE = Object.freeze({
+  QR: 'QR',
+  ADMIN: 'Admin',
+});
+
+// Hours from complaint creation until the complaint is due for resolution.
+const COMPLAINT_SLA_HOURS = Object.freeze({
+  Low: 72,
+  Medium: 48,
+  High: 24,
+  Critical: 4,
+});
+
+const COMPLAINT_ACTIVE_STATUSES = Object.freeze([
+  COMPLAINT_STATUS.OPEN,
+  COMPLAINT_STATUS.IN_PROGRESS,
 ]);
 
 const STOCK_MOVEMENT_TYPES = Object.freeze({
@@ -184,6 +347,25 @@ const NUMBER_CATEGORIES = Object.freeze({
 
 module.exports = {
   ROLES,
+  ADMIN_TYPES,
+  JOB_ROLES,
+  VISIT_STATUS,
+  VISIT_TYPE,
+  DAY_VISIT_STATUS,
+  VISIT_EXPENSE_STATUS,
+  VISIT_EXPENSE_CLAIM_MODE,
+  TRANSPORT_MODE,
+  PRIVATE_KM_RATE,
+  VISIT_APPROVAL_DECISION,
+  VISIT_EXCEPTION_KIND,
+  MISSED_VISIT_REASONS,
+  DEFAULT_VISIT_GEOFENCE_METERS,
+  ATTENDANCE_CORRECTION_STATUS,
+  ATTENDANCE_CORRECTION_KIND,
+  GENDER,
+  ATTENDANCE_QUOTA_MIN,
+  LEAVE_PAY,
+  LEAVE_STATUS,
   USER_STATUS,
   REPORT_STATUS,
   PAYMENT_STATUS,
@@ -202,4 +384,10 @@ module.exports = {
   ITEM_MASTER_CATALOG_KINDS,
   ITEM_MASTER_CATALOG_FIELDS,
   ITEM_MASTER_ITEM_CATALOG_FIELDS,
+  COMPLAINT_STATUS,
+  COMPLAINT_PRIORITY,
+  COMPLAINT_CATEGORY,
+  COMPLAINT_SOURCE,
+  COMPLAINT_SLA_HOURS,
+  COMPLAINT_ACTIVE_STATUSES,
 };

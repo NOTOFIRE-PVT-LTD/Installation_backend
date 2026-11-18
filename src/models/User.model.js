@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
-const { ROLES, USER_STATUS } = require('../config/constants');
+const { ROLES, USER_STATUS, ADMIN_TYPES, JOB_ROLES, GENDER } = require('../config/constants');
 
 const { Schema } = mongoose;
 
@@ -40,6 +40,21 @@ const userSchema = new Schema(
       publicId: { type: String, default: null },
     },
     role: { type: String, enum: Object.values(ROLES), required: true, default: ROLES.USER },
+    adminType: {
+      type: String,
+      enum: Object.values(ADMIN_TYPES),
+    },
+    appSuperAdmin: { type: Boolean, default: false },
+    jobRole: {
+      type: String,
+      enum: Object.values(JOB_ROLES),
+      default: JOB_ROLES.INSTALLER,
+    },
+    gender: {
+      type: String,
+      enum: Object.values(GENDER),
+      default: GENDER.MALE,
+    },
     permissions: { type: Schema.Types.ObjectId, ref: 'Permission', default: null },
     status: { type: String, enum: Object.values(USER_STATUS), default: USER_STATUS.ACTIVE },
     resetPasswordToken: { type: String, select: false, default: null },
