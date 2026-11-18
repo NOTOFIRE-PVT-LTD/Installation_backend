@@ -108,7 +108,9 @@ async function list(query) {
   let safeItems = items.map((u) => u.toSafeObject());
   let safeTotal = total;
   if (query.portalApp === 'workspace') {
-    safeItems = safeItems.filter((u) => resolvePortalAccess(u.email).workspace);
+    safeItems = safeItems.filter((u) =>
+      resolvePortalAccess(u.email, { portalSource: u.portalSource, adminType: u.adminType }).workspace
+    );
     if (safeItems.length !== items.length) {
       safeTotal = Math.max(0, total - (items.length - safeItems.length));
     }

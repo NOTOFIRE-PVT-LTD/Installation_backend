@@ -45,6 +45,12 @@ const userSchema = new Schema(
       enum: Object.values(ADMIN_TYPES),
     },
     appSuperAdmin: { type: Boolean, default: false },
+    /** 'pnl' = provisioned from P&L only (no Workspace app). Unset = Workspace user. */
+    portalSource: {
+      type: String,
+      enum: ['pnl', 'workspace'],
+      default: undefined,
+    },
     jobRole: {
       type: String,
       enum: Object.values(JOB_ROLES),

@@ -23,14 +23,21 @@ function roleLabel(adminType, role) {
   return role || null;
 }
 
+function accessForUser(user) {
+  return resolvePortalAccess(user.email, {
+    portalSource: user.portalSource,
+    adminType: user.adminType,
+  });
+}
+
 async function getPortalSession(userId) {
   const user = await User.findById(userId)
-    .select('name email mobileNumber role adminType status')
+    .select('name email mobileNumber role adminType status portalSource')
     .lean();
   if (!user || user.status === 'inactive') {
     throw new ApiError(401, 'User inactive or missing');
   }
-  const access = resolvePortalAccess(user.email);
+  const access = accessForUser(user);
   return {
     user: toPortalUser(user),
     access,
@@ -43,7 +50,7 @@ function openPnlApp(userDoc) {
   const email = userDoc?.email;
   if (!email) throw new ApiError(401, 'User inactive or missing');
   if (userDoc.status === 'inactive') throw new ApiError(401, 'User inactive or missing');
-  const access = resolvePortalAccess(email);
+  const access = accessForUser(userDoc);
   if (!access.pnl) throw new ApiError(403, 'No P&L access');
   const code = mintCentralSsoCode({
     email,
@@ -58,7 +65,10 @@ function openPnlApp(userDoc) {
 function upsertDirectoryRow(map, row) {
   const email = String(row.email || '').toLowerCase().trim();
   if (!email) return;
-  const access = resolvePortalAccess(email);
+  const access = resolvePortalAccess(email, {
+    portalSource: row.portalSource,
+    adminType: row.adminType,
+  });
   if (!access.pnl && !access.workspace) return;
 
   const existing = map.get(email);
@@ -83,7 +93,10 @@ function upsertDirectoryRow(map, row) {
 
 async function listPortalDirectory() {
   const [wsUsers, pnlUsers] = await Promise.all([
-    User.find({}).select('name email mobileNumber role adminType status').sort({ name: 1 }).lean(),
+    User.find({})
+      .select('name email mobileNumber role adminType status portalSource')
+      .sort({ name: 1 })
+      .lean(),
     listPnlDirectoryUsers(),
   ]);
 
@@ -98,6 +111,8 @@ async function listPortalDirectory() {
       phone: u.mobileNumber || null,
       role: roleLabel(u.adminType, u.role),
       active: u.status !== 'inactive',
+      portalSource: u.portalSource,
+      adminType: u.adminType,
     });
   });
 

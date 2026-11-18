@@ -1,7 +1,10 @@
 /**
- * Portal app grants — mirrors Centralisation resolveCentralAccess.
+ * Portal app grants.
  * Env: CENTRAL_BOTH_EMAILS | PRIMARY_SUPER_ADMIN_EMAIL |
  *      CENTRAL_PNL_EMAILS | CENTRAL_WORKSPACE_EMAILS | CENTRAL_PNL_DEFAULT
+ *
+ * User.portalSource === 'pnl' → P&L-only (auto-provisioned from P&L OTP/password).
+ * Workspace Mongo users → workspace; P&L only if listed or CENTRAL_PNL_DEFAULT.
  */
 
 function parseEmailList(raw) {
@@ -13,7 +16,11 @@ function parseEmailList(raw) {
   );
 }
 
-function resolvePortalAccess(email) {
+function accessCount(a) {
+  return Number(Boolean(a?.pnl)) + Number(Boolean(a?.workspace));
+}
+
+function resolvePortalAccess(email, opts = {}) {
   const e = String(email || '').toLowerCase().trim();
   const both = parseEmailList(process.env.CENTRAL_BOTH_EMAILS);
   const primary = String(process.env.PRIMARY_SUPER_ADMIN_EMAIL || '')
@@ -22,7 +29,7 @@ function resolvePortalAccess(email) {
   const pnlList = parseEmailList(process.env.CENTRAL_PNL_EMAILS);
   const wsList = parseEmailList(process.env.CENTRAL_WORKSPACE_EMAILS);
 
-  if (e && (both.has(e) || (primary && e === primary))) {
+  if (opts.adminType === 'SUPER_ADMIN' || (e && (both.has(e) || (primary && e === primary)))) {
     return { pnl: true, workspace: true };
   }
 
@@ -32,13 +39,14 @@ function resolvePortalAccess(email) {
     return { pnl: listedPnl, workspace: listedWs };
   }
 
-  // Mongo/Workspace users: workspace by default; P&L via lists or CENTRAL_PNL_DEFAULT.
-  const defaultPnl = process.env.CENTRAL_PNL_DEFAULT !== 'false';
-  return { pnl: defaultPnl, workspace: true };
-}
+  // Auto-created from P&L OTP/password — never grant Workspace by default.
+  if (opts.portalSource === 'pnl') {
+    return { pnl: true, workspace: false };
+  }
 
-function accessCount(a) {
-  return Number(Boolean(a?.pnl)) + Number(Boolean(a?.workspace));
+  // Real Workspace users: workspace always; P&L only when default/list says so.
+  const defaultPnl = process.env.CENTRAL_PNL_DEFAULT === 'true';
+  return { pnl: defaultPnl, workspace: true };
 }
 
 module.exports = { resolvePortalAccess, accessCount, parseEmailList };
