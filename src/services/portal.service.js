@@ -45,12 +45,21 @@ async function getPortalSession(userId) {
   };
 }
 
-/** Mint P&L SSO URL from the already-authenticated req.user (no extra DB read). */
-function openPnlApp(userDoc) {
+/** Mint P&L SSO URL from user document (re-checking portalSource if unset). */
+async function openPnlApp(userDoc) {
   const email = userDoc?.email;
-  if (!email) throw new ApiError(401, 'User inactive or missing');
-  if (userDoc.status === 'inactive') throw new ApiError(401, 'User inactive or missing');
-  const access = accessForUser(userDoc);
+  if (!email || userDoc.status === 'inactive') {
+    throw new ApiError(401, 'User inactive or missing');
+  }
+  let portalSource = userDoc.portalSource;
+  if (!portalSource && userDoc._id) {
+    const raw = await User.findById(userDoc._id).select('portalSource').lean();
+    portalSource = raw?.portalSource;
+  }
+  const access = resolvePortalAccess(email, {
+    portalSource,
+    adminType: userDoc.adminType,
+  });
   if (!access.pnl) throw new ApiError(403, 'No P&L access');
   const code = mintCentralSsoCode({
     email,
@@ -124,6 +133,8 @@ async function listPortalDirectory() {
       phone: u.phone,
       role: u.role,
       active: u.active,
+      // P&L DB rows are P&L-only unless also a real Workspace mongo user above.
+      portalSource: 'pnl',
     });
   });
 

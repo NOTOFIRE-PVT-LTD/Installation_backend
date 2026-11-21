@@ -2,7 +2,6 @@ const userRepository = require('../repositories/user.repository');
 const permissionRepository = require('../repositories/permission.repository');
 const refreshTokenRepository = require('../repositories/refreshToken.repository');
 const permissionService = require('./permission.service');
-const { resolvePortalAccess } = require('../utils/portalAccess');
 const authService = require('./auth.service');
 const emailService = require('./email.service');
 const uploadService = require('./upload.service');
@@ -22,79 +21,14 @@ const {
   permissionsForApp,
 } = require('../utils/roles');
 
+const { buildUserFilter } = require('./userFilter.service');
 const ALLOWED_SORT_FIELDS = ['name', 'email', 'role', 'status', 'createdAt'];
 
-async function list(query) {
+async function list(query, actor) {
   const { page, pageSize, skip } = buildPagination(query);
   const sort = buildSort(query, ALLOWED_SORT_FIELDS);
 
-  const filter = {};
-  if (query.role === ADMIN_TYPES.SUPER_ADMIN || query.adminType === ADMIN_TYPES.SUPER_ADMIN) {
-    filter.role = ROLES.ADMIN;
-    filter.adminType = ADMIN_TYPES.SUPER_ADMIN;
-  } else if (query.role) {
-    filter.role = query.role;
-    if (query.role === ROLES.ADMIN) {
-      filter.adminType = { $ne: ADMIN_TYPES.SUPER_ADMIN };
-    }
-  }
-  if (query.adminType && query.adminType !== ADMIN_TYPES.SUPER_ADMIN) filter.adminType = query.adminType;
-  if (query.jobRole) filter.jobRole = query.jobRole;
-  if (query.status) filter.status = query.status;
-
-  const searchOr = query.search
-    ? [
-        { name: new RegExp(query.search, 'i') },
-        { email: new RegExp(query.search, 'i') },
-        { mobileNumber: new RegExp(query.search, 'i') },
-      ]
-    : null;
-
-  if (query.scope === 'attendance' || query.scope === 'tracking') {
-    delete filter.role;
-    delete filter.jobRole;
-    delete filter.adminType;
-    const scopeOr = [
-      { role: ROLES.USER, jobRole: JOB_ROLES.SALESPERSON },
-      { role: ROLES.ADMIN, adminType: ADMIN_TYPES.SALES_COORDINATOR },
-    ];
-    if (searchOr) {
-      filter.$and = [{ $or: scopeOr }, { $or: searchOr }];
-    } else {
-      filter.$or = scopeOr;
-    }
-  } else if (searchOr) {
-    filter.$or = searchOr;
-  }
-
-  if (query.apps) {
-    const keys = String(query.apps)
-      .split(',')
-      .map((key) => key.trim())
-      .filter((key) => PERMISSION_KEYS.includes(key));
-    if (keys.length) {
-      const permOr = keys.map((key) => ({ [key]: true }));
-      if (keys.includes('attendance')) permOr.push({ salespersonTracking: true });
-      const permDocs = await permissionRepository.find({ $or: permOr }, { select: 'user' });
-      const userIds = permDocs.map((doc) => doc.user).filter(Boolean);
-      const appsOr = [{ _id: { $in: userIds } }, { adminType: ADMIN_TYPES.SUPER_ADMIN }];
-      if (keys.includes('complaints')) appsOr.push({ adminType: ADMIN_TYPES.COMPLAINT_COORDINATOR });
-      if (keys.includes('attendance')) {
-        appsOr.push({ jobRole: JOB_ROLES.SALESPERSON });
-        appsOr.push({ adminType: ADMIN_TYPES.SALES_COORDINATOR });
-      }
-      if (keys.includes('tenders')) appsOr.push({ adminType: ADMIN_TYPES.TENDER_COORDINATOR });
-      const appsClause = { $or: appsOr };
-      if (filter.$and) {
-        filter.$and.push(appsClause);
-      } else if (filter.$or) {
-        filter.$and = [{ $or: filter.$or }, appsClause];
-        delete filter.$or;
-      } else {
-        filter.$or = appsOr;
-      }
-    }
-  }
+  const filter = await buildUserFilter(query, actor);
 
   const { items, total } = await userRepository.paginate({
     filter,
@@ -104,21 +38,9 @@ async function list(query) {
     populate: 'permissions',
   });
 
-  // Workspace Users page: hide P&L-only accounts (no workspace grant).
-  let safeItems = items.map((u) => u.toSafeObject());
-  let safeTotal = total;
-  if (query.portalApp === 'workspace') {
-    safeItems = safeItems.filter((u) =>
-      resolvePortalAccess(u.email, { portalSource: u.portalSource, adminType: u.adminType }).workspace
-    );
-    if (safeItems.length !== items.length) {
-      safeTotal = Math.max(0, total - (items.length - safeItems.length));
-    }
-  }
-
   return buildPaginatedResult({
-    items: safeItems,
-    total: safeTotal,
+    items: items.map((u) => u.toSafeObject()),
+    total,
     page,
     pageSize,
   });
@@ -293,6 +215,24 @@ async function update(id, data, file, actorId) {
   }
 
   await userRepository.updateById(id, updates);
+  if (user.email && (updates.mobileNumber || updates.name)) {
+    try {
+      const { getPool } = require('../utils/pnlPasswordFallback');
+      const db = getPool();
+      if (db) {
+        const cleanPhone = updates.mobileNumber ? String(updates.mobileNumber).replace(/\D/g, '').slice(-10) : '';
+        await db.query(
+          `UPDATE "User"
+           SET phone = COALESCE(NULLIF($1, ''), phone),
+               name = COALESCE(NULLIF($2, ''), name)
+           WHERE lower(email) = $3`,
+          [cleanPhone, updates.name || '', String(user.email).toLowerCase().trim()]
+        );
+      }
+    } catch (syncErr) {
+      console.warn('[user.service] pnl sync error:', syncErr.message);
+    }
+  }
   return getById(id);
 }
 

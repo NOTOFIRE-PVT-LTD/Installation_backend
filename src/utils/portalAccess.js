@@ -29,19 +29,20 @@ function resolvePortalAccess(email, opts = {}) {
   const pnlList = parseEmailList(process.env.CENTRAL_PNL_EMAILS);
   const wsList = parseEmailList(process.env.CENTRAL_WORKSPACE_EMAILS);
 
+  // Gaurav / Mansi / SUPER_ADMIN → both apps chooser.
   if (opts.adminType === 'SUPER_ADMIN' || (e && (both.has(e) || (primary && e === primary)))) {
     return { pnl: true, workspace: true };
+  }
+
+  // P&L-only shadows — before email lists / CENTRAL_PNL_DEFAULT.
+  if (opts.portalSource === 'pnl') {
+    return { pnl: true, workspace: false };
   }
 
   const listedPnl = Boolean(e && pnlList.has(e));
   const listedWs = Boolean(e && wsList.has(e));
   if (listedPnl || listedWs) {
     return { pnl: listedPnl, workspace: listedWs };
-  }
-
-  // Auto-created from P&L OTP/password — never grant Workspace by default.
-  if (opts.portalSource === 'pnl') {
-    return { pnl: true, workspace: false };
   }
 
   // Real Workspace users: workspace always; P&L only when default/list says so.
