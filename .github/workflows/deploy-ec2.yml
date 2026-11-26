@@ -1,7 +1,7 @@
 # Auto-deploy Installation API to EC2 after push to dev or main.
 # Pulls the pushed branch on the server and restarts PM2 (no Vite/Next build).
 # Required repo secrets (Settings → Secrets → Actions):
-#   EC2_HOST       e.g. 13.201.19.145
+#   EC2_HOST       e.g. 15.252.229.46
 #   EC2_USER       e.g. ubuntu
 #   EC2_SSH_KEY    full private key PEM contents
 #   EC2_API_DIR    e.g. /var/www/workspace-api  (optional; default below)
