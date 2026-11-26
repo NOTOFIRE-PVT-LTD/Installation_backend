@@ -12,9 +12,14 @@ const openPnl = asyncHandler(async (req, res) => {
   sendSuccess(res, { message: 'OK', data });
 });
 
+const openLeadTrack = asyncHandler(async (req, res) => {
+  const data = await portalService.openLeadTrackApp(req.user);
+  sendSuccess(res, { message: 'OK', data });
+});
+
 const directory = asyncHandler(async (req, res) => {
   const users = await portalService.listPortalDirectory();
   sendSuccess(res, { message: 'OK', data: { users } });
 });
 
-module.exports = { me, openPnl, directory };
+module.exports = { me, openPnl, openLeadTrack, directory };

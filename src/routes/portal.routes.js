@@ -7,6 +7,7 @@ const router = express.Router();
 router.use(authenticate);
 router.get('/me', portalController.me);
 router.post('/open-pnl', portalController.openPnl);
+router.post('/open-leadtrack', portalController.openLeadTrack);
 router.get('/directory', portalController.directory);
 
 module.exports = router;

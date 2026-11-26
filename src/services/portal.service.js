@@ -8,6 +8,23 @@ function pnlPublicUrl() {
   return String(process.env.PNL_PUBLIC_URL || 'http://localhost:3000').replace(/\/$/, '');
 }
 
+function leadTrackPublicUrl() {
+  return String(
+    process.env.LEADTRACK_PUBLIC_URL || 'http://localhost:3010',
+  ).replace(/\/$/, '');
+}
+
+function mapLeadTrackClaims(userDoc) {
+  const admin =
+    userDoc.role === 'Admin' ||
+    userDoc.adminType === 'SUPER_ADMIN' ||
+    userDoc.adminType === 'GENERAL_ADMIN';
+  return {
+    accountRole: admin ? 'admin' : 'user',
+    designations: admin ? [] : ['telecaller'],
+  };
+}
+
 function toPortalUser(user) {
   return {
     id: String(user._id),
@@ -68,6 +85,25 @@ async function openPnlApp(userDoc) {
   });
   return {
     url: `${pnlPublicUrl()}/api/sso/consume?code=${encodeURIComponent(code)}`,
+  };
+}
+
+/** Mint LeadTrack SSO URL — Centralisation login only; no LeadTrack signup. */
+async function openLeadTrackApp(userDoc) {
+  const email = userDoc?.email;
+  if (!email || userDoc.status === 'inactive') {
+    throw new ApiError(401, 'User inactive or missing');
+  }
+  const mapped = mapLeadTrackClaims(userDoc);
+  const code = mintCentralSsoCode({
+    email,
+    name: userDoc.name || null,
+    app: 'leadtrack',
+    accountRole: mapped.accountRole,
+    designations: mapped.designations,
+  });
+  return {
+    url: `${leadTrackPublicUrl()}/api/sso/consume?code=${encodeURIComponent(code)}`,
   };
 }
 
@@ -146,6 +182,8 @@ async function listPortalDirectory() {
 module.exports = {
   getPortalSession,
   openPnlApp,
+  openLeadTrackApp,
   listPortalDirectory,
   pnlPublicUrl,
+  leadTrackPublicUrl,
 };
