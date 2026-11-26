@@ -45,10 +45,10 @@ const userSchema = new Schema(
       enum: Object.values(ADMIN_TYPES),
     },
     appSuperAdmin: { type: Boolean, default: false },
-    /** 'pnl' = provisioned from P&L only (no Workspace app). Unset = Workspace user. */
+    /** 'pnl' | 'leadtrack' = single-app shadows. Unset = Workspace user. */
     portalSource: {
       type: String,
-      enum: ['pnl', 'workspace'],
+      enum: ['pnl', 'workspace', 'leadtrack'],
       default: undefined,
     },
     jobRole: {
@@ -80,6 +80,14 @@ userSchema.index(
     partialFilterExpression: {
       legacySupabaseId: { $type: 'string' },
     },
+  }
+);
+/** One WhatsApp mobile per person (skip blank). */
+userSchema.index(
+  { mobileNumber: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { mobileNumber: { $gt: '' } },
   }
 );
 

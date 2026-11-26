@@ -1,5 +1,6 @@
 const portalService = require('../services/portal.service');
 const asyncHandler = require('../utils/asyncHandler');
+const ApiError = require('../utils/ApiError');
 const { sendSuccess } = require('../utils/ApiResponse');
 
 const me = asyncHandler(async (req, res) => {
@@ -22,4 +23,14 @@ const directory = asyncHandler(async (req, res) => {
   sendSuccess(res, { message: 'OK', data: { users } });
 });
 
-module.exports = { me, openPnl, openLeadTrack, directory };
+/** LeadTrack server → Centralisation user mirror (SSO_SECRET). */
+const upsertLeadTrackUser = asyncHandler(async (req, res) => {
+  const secret = req.headers['x-leadtrack-provision-secret'];
+  if (!secret || secret !== process.env.SSO_SECRET) {
+    throw new ApiError(401, 'Unauthorized');
+  }
+  const data = await portalService.upsertLeadTrackPortalUser(req.body || {});
+  sendSuccess(res, { message: 'OK', data });
+});
+
+module.exports = { me, openPnl, openLeadTrack, directory, upsertLeadTrackUser };

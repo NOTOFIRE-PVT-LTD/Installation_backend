@@ -19,10 +19,49 @@ function mapLeadTrackClaims(userDoc) {
     userDoc.role === 'Admin' ||
     userDoc.adminType === 'SUPER_ADMIN' ||
     userDoc.adminType === 'GENERAL_ADMIN';
-  return {
-    accountRole: admin ? 'admin' : 'user',
-    designations: admin ? [] : ['telecaller'],
-  };
+  if (admin) return { accountRole: 'admin', designations: [] };
+  const tag = String(userDoc.company || '');
+  if (tag.includes('technical_staff')) {
+    return { accountRole: 'user', designations: ['technical_staff'] };
+  }
+  return { accountRole: 'user', designations: ['telecaller'] };
+}
+
+/** Server-to-server: mirror LeadTrack CRM users into Centralisation login. */
+async function upsertLeadTrackPortalUser({ email, name, password, accountRole, designations }) {
+  const e = String(email || '').toLowerCase().trim();
+  if (!e || !password || String(password).length < 6) {
+    throw new ApiError(400, 'Email and password (6+) required');
+  }
+  const isAdmin = accountRole === 'admin';
+  const des = Array.isArray(designations) ? designations : [];
+  const company = isAdmin
+    ? 'leadtrack:admin'
+    : des.includes('technical_staff')
+      ? 'leadtrack:technical_staff'
+      : 'leadtrack:telecaller';
+  let user = await User.findOne({ email: e }).select('+password');
+  if (!user) {
+    user = new User({
+      name: name || e.split('@')[0],
+      email: e,
+      password,
+      role: isAdmin ? 'Admin' : 'User',
+      portalSource: 'leadtrack',
+      company,
+      jobRole: 'SALESPERSON',
+      status: 'active',
+    });
+  } else {
+    user.name = name || user.name;
+    user.password = password;
+    user.role = isAdmin ? 'Admin' : 'User';
+    user.portalSource = 'leadtrack';
+    user.company = company;
+    user.status = 'active';
+  }
+  await user.save();
+  return { id: String(user._id), email: user.email };
 }
 
 function toPortalUser(user) {
@@ -93,6 +132,13 @@ async function openLeadTrackApp(userDoc) {
   const email = userDoc?.email;
   if (!email || userDoc.status === 'inactive') {
     throw new ApiError(401, 'User inactive or missing');
+  }
+  const access = resolvePortalAccess(email, {
+    portalSource: userDoc.portalSource,
+    adminType: userDoc.adminType,
+  });
+  if (!access.leadtrack && !access.workspace) {
+    throw new ApiError(403, 'No LeadTrack access');
   }
   const mapped = mapLeadTrackClaims(userDoc);
   const code = mintCentralSsoCode({
@@ -184,6 +230,7 @@ module.exports = {
   openPnlApp,
   openLeadTrackApp,
   listPortalDirectory,
+  upsertLeadTrackPortalUser,
   pnlPublicUrl,
   leadTrackPublicUrl,
 };
