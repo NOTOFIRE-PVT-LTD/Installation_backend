@@ -96,22 +96,55 @@ Field mapping:
 - Do not invent rows. Use null when missing.`;
 
 async function callGemini(text, apiKey) {
-  const model = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ role: 'user', parts: [{ text: `${SYSTEM_PROMPT}\n\nLOA PDF TEXT:\n${text}` }] }],
-      generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
-    }),
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new ApiError(502, payload?.error?.message || `Gemini request failed (${response.status})`);
+  const configuredModel = (process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite').trim().replace(/^models\//, '');
+  const modelsToTry = [
+    ...new Set([
+      configuredModel,
+      'gemini-3.5-flash-lite',
+      'gemini-flash-lite-latest',
+      'gemini-3.8-flash',
+      'gemini-3.7-flash',
+      'gemini-3.1-flash-lite',
+      'gemini-3.6-flash',
+      'gemini-3.5-flash',
+    ]),
+  ].filter((m) => m && !m.startsWith('gemini-2.5'));
+
+  let lastError = null;
+  for (const model of modelsToTry) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: `${SYSTEM_PROMPT}\n\nLOA PDF TEXT:\n${text}` }] }],
+          generationConfig: { temperature: 0.1, maxOutputTokens: 16384, responseMimeType: 'application/json' },
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        lastError = new ApiError(502, payload?.error?.message || `Gemini request failed (${response.status})`);
+        continue;
+      }
+      const parts = payload?.candidates?.[0]?.content?.parts || [];
+      const content = parts
+        .filter((p) => p && typeof p.text === 'string' && !p.thought)
+        .map((p) => p.text)
+        .join('\n')
+        .trim();
+      if (!content) {
+        const reason = payload?.candidates?.[0]?.finishReason || payload?.promptFeedback?.blockReason || 'empty';
+        lastError = new ApiError(502, `Gemini returned an empty response (${model}: ${reason})`);
+        continue;
+      }
+      return extractJsonObject(content);
+    } catch (err) {
+      lastError = err instanceof ApiError ? err : new ApiError(502, err?.message || `Gemini request failed (${model})`);
+      continue;
+    }
   }
-  const content = payload?.candidates?.[0]?.content?.parts?.map((p) => p.text).join('\n') || '';
-  return extractJsonObject(content);
+  throw lastError || new ApiError(502, 'Gemini request failed');
 }
 
 async function callOpenAi(text, apiKey) {
@@ -271,9 +304,9 @@ async function buildExcel(query = {}) {
     const ids = Array.isArray(query.ids)
       ? query.ids
       : String(query.ids)
-          .split(',')
-          .map((id) => id.trim())
-          .filter(Boolean);
+        .split(',')
+        .map((id) => id.trim())
+        .filter(Boolean);
     if (ids.length) filter._id = { $in: ids };
   }
 

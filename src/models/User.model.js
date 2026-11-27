@@ -78,13 +78,16 @@ userSchema.index(
 );
 
 userSchema.pre('save', async function preSave(next) {
-  if (!this.isModified('password')) return next();
+  if (!this.isModified('password') || !this.password) return next();
   this.password = await bcrypt.hash(this.password, 10);
   if (!this.isNew) this.passwordChangedAt = new Date();
   next();
 });
 
-userSchema.methods.comparePassword = function comparePassword(candidate) {
+userSchema.methods.comparePassword = async function comparePassword(candidate) {
+  if (!candidate || typeof candidate !== 'string' || !this.password || typeof this.password !== 'string') {
+    return false;
+  }
   return bcrypt.compare(candidate, this.password);
 };
 

@@ -15,4 +15,11 @@ describe('rejectIfPasswordReused', () => {
     const user = { comparePassword: async (candidate) => candidate === 'OldPass123' };
     await assert.doesNotReject(() => rejectIfPasswordReused(user, 'NewPass123'));
   });
+
+  test('allows setting a password when the user has no existing password hash (e.g. migrated account)', async () => {
+    const User = require('../models/User.model');
+    const migratedUser = new User({ name: 'Harshit', email: 'harshit@example.com', legacySupabaseId: 'supa-1' });
+    assert.equal(await migratedUser.comparePassword('NewPass123'), false);
+    await assert.doesNotReject(() => rejectIfPasswordReused(migratedUser, 'NewPass123'));
+  });
 });

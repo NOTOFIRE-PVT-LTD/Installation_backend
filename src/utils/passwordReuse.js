@@ -4,6 +4,7 @@ const REUSED_PASSWORD_MESSAGE = 'Try a different password. This was used previou
 
 async function rejectIfPasswordReused(user, newPassword) {
   if (!user || !newPassword || typeof user.comparePassword !== 'function') return;
+  if ('password' in user && !user.password) return;
   const reused = await user.comparePassword(newPassword);
   if (reused) throw new ApiError(400, REUSED_PASSWORD_MESSAGE);
 }

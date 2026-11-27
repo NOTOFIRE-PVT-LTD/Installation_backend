@@ -145,7 +145,19 @@ const uploadComplaintPhotos = multer({
   limits: { fileSize: env.upload.maxImageSizeMb * 1024 * 1024 },
 }).array('photos', 3);
 
+const uploadCallLetterPdf = multer({
+  storage,
+  fileFilter: (_req, file, cb) => {
+    if (!MIXED_MIME_TYPES.includes(file.mimetype)) {
+      return cb(new Error('Only PDF or image files (jpeg, png, webp) are allowed'));
+    }
+    cb(null, true);
+  },
+  limits: { fileSize: 25 * 1024 * 1024 },
+}).single('file');
+
 module.exports = {
+  uploadCallLetterPdf,
   uploadSalesTravelProofs,
   uploadAtlantaPaymentProofs,
   uploadQuotationProductFiles,

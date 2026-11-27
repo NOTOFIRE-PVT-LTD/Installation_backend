@@ -1,16 +1,16 @@
 const { body, param, query } = require('express-validator');
 
 const create = [
-  body('tender').isMongoId().withMessage('Valid tender is required'),
-  body('zone').trim().notEmpty().withMessage('Zone is required'),
-  body('callLetter').trim().notEmpty().withMessage('Call Letter is required'),
+  body('tender').optional({ values: 'falsy' }).isMongoId().withMessage('Invalid tender id'),
+  body('zone').optional().isString(),
+  body('callLetter').optional().isString(),
 ];
 
 const update = [
   param('id').isMongoId().withMessage('Invalid call letter id'),
-  body('tender').optional().isMongoId().withMessage('Valid tender is required'),
-  body('zone').optional().trim().notEmpty(),
-  body('callLetter').optional().trim().notEmpty(),
+  body('tender').optional({ values: 'falsy' }).isMongoId().withMessage('Invalid tender id'),
+  body('zone').optional().isString(),
+  body('callLetter').optional().isString(),
 ];
 
 const idParam = [param('id').isMongoId().withMessage('Invalid call letter id')];
