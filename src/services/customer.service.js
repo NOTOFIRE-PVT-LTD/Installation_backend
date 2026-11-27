@@ -76,12 +76,12 @@ async function duplicateHits(input, excludeId) {
 }
 
 async function list(query, actor) {
-  const { page, pageSize, skip } = buildPagination(query);
+  const { page, pageSize, skip } = buildPagination(query, { maxPageSize: 1000 });
   const sort = buildSort(query, ALLOWED_SORT_FIELDS);
   const filter = scopedFilter(actor);
 
-  if (query.active === 'true') filter.active = true;
-  if (query.active === 'false') filter.active = false;
+  if (query.active === 'true' || query.active === true) filter.active = true;
+  if (query.active === 'false' || query.active === false) filter.active = false;
   if (query.assignedSalesperson && actor.role === ROLES.ADMIN) {
     filter.assignedSalesperson = query.assignedSalesperson;
   }

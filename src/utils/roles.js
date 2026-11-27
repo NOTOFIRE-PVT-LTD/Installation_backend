@@ -1,15 +1,16 @@
 const { ROLES, ADMIN_TYPES, JOB_ROLES, PERMISSION_KEYS } = require('../config/constants');
 
 const PLATFORM_OWNER_EMAILS = [
-  'gauravjain@atlantatelecables.com',
   'gauravjain@gmail.com',
   'mansi@gmail.com',
+  'ridh.jain.rj@gmail.com',
+  'gauravjain@atlantatelecables.com',
 ];
 
 // One app = one permission set. Do not cross-grant installation dashboard into
 // complaints/attendance admins — that mixed apps in the sidebar and landing path.
 const APP_PERMISSION_SETS = {
-  complaints: ['complaints'],
+  complaints: ['complaints', 'users'],
   attendance: ['attendance', 'salespersonTracking', 'customers', 'contractorAttendance'],
   contractorAttendance: ['contractorAttendance'],
   projects: ['projects', 'reports', 'cadDrawing', 'claimApprovals', 'dashboard'],
@@ -21,6 +22,9 @@ const APP_PERMISSION_SETS = {
   atlantaPayments: ['atlantaPayments'],
   shipping: ['shipping'],
   importControl: ['importControl'],
+  payflow: ['payflow', 'payflowUser'],
+  payflowUser: ['payflowUser'],
+  salesTravelRequests: ['salesTravelRequests'],
 };
 
 function isPlatformOwner(user) {

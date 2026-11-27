@@ -44,7 +44,22 @@ const list = [
 
 const updateProfile = [
   body('name').optional().trim().notEmpty().withMessage('Name cannot be empty'),
-  body('mobileNumber').optional().trim().notEmpty().withMessage('Mobile number cannot be empty'),
+  // Empty string clears WhatsApp login number; 10 digits when set.
+  body('mobileNumber')
+    .optional()
+    .customSanitizer((v) => {
+      if (v === undefined || v === null) return v;
+      const raw = String(v).trim();
+      if (!raw) return '';
+      return raw.replace(/\D/g, '').slice(-10);
+    })
+    .custom((v) => {
+      if (v === undefined || v === '') return true;
+      if (!/^\d{10}$/.test(String(v))) {
+        throw new Error('Enter a valid 10-digit mobile number');
+      }
+      return true;
+    }),
 ];
 
 const setPassword = [

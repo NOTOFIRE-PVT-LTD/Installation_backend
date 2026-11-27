@@ -82,16 +82,61 @@ function mapTender(tender) {
   };
 }
 
+/** Workspace apps Super Admin can jump to from global search. */
+const SEARCHABLE_APPS = [
+  { id: 'leadTrack', title: 'LeadTrack', aliases: ['lead', 'crm', 'leads'], path: '/lead-track', permission: 'leadTrack' },
+  { id: 'shipping', title: 'Shipping Control', aliases: ['ship', 'dispatch'], path: '/shipping', permission: 'shipping' },
+  { id: 'importControl', title: 'Import Control', aliases: ['import'], path: '/import-control', permission: 'importControl' },
+  { id: 'complaints', title: 'Complaint Resolution', aliases: ['complaint', 'ticket'], path: '/complaints/dashboard', permission: 'complaints' },
+  { id: 'attendance', title: 'Attendance', aliases: ['visit', 'field'], path: '/attendance', permission: 'attendance' },
+  { id: 'projects', title: 'Projects', aliases: ['installation'], path: '/projects', permission: 'projects' },
+  { id: 'users', title: 'Users', aliases: ['people', 'permission'], path: '/users', permission: 'users' },
+  { id: 'payflow', title: 'Payflow', aliases: ['payment', 'vendor'], path: '/payflow', permission: 'payflow' },
+  { id: 'salesTravelRequests', title: 'Sales Travel Request', aliases: ['travel'], path: '/sales-travel-requests', permission: 'salesTravelRequests' },
+];
+
+function hasAppPermission(user, key) {
+  const isSa =
+    user?.adminType === 'SUPER_ADMIN' ||
+    String(user?.email || '').toLowerCase() === 'admin@nfsite.com';
+  if (isSa) return true;
+  return Boolean(user?.permissions?.[key]);
+}
+
+function searchApps(q, user, limit) {
+  const needle = String(q || '').toLowerCase();
+  return SEARCHABLE_APPS.filter((app) => {
+    if (!hasAppPermission(user, app.permission)) return false;
+    const hay = `${app.title} ${app.aliases.join(' ')} ${app.id}`.toLowerCase();
+    return hay.includes(needle) || needle.split(/\s+/).every((p) => hay.includes(p));
+  })
+    .slice(0, limit)
+    .map((app) => ({
+      type: 'app',
+      id: app.id,
+      title: app.title,
+      subtitle: 'Workspace app',
+      path: app.path,
+    }));
+}
+
 async function search(query, user) {
   const q = String(query?.q || query?.search || '').trim();
   const limit = Math.min(Math.max(Number(query?.limit) || 5, 1), 10);
 
   if (q.length < 2) {
-    return { projects: [], stations: [], users: [], numbers: [], tenders: [] };
+    return { apps: [], projects: [], stations: [], users: [], numbers: [], tenders: [] };
   }
 
   const regex = new RegExp(escapeRegex(q), 'i');
-  const result = { projects: [], stations: [], users: [], numbers: [], tenders: [] };
+  const result = {
+    apps: searchApps(q, user, limit),
+    projects: [],
+    stations: [],
+    users: [],
+    numbers: [],
+    tenders: [],
+  };
 
   const tasks = [];
 

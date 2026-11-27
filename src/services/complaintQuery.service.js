@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const complaintRepository = require('../repositories/complaint.repository');
 const ApiError = require('../utils/ApiError');
 const { ROLES, JOB_ROLES } = require('../config/constants');
@@ -11,6 +12,14 @@ const {
   buildFilter,
 } = require('./complaintHelpers');
 const { publicTrack } = require('./complaintPublicTrack.service');
+
+function toValidObjectIds(items) {
+  if (!Array.isArray(items)) return [];
+  return items
+    .map((item) => (item?._id ? item._id : item))
+    .filter((id) => id && mongoose.Types.ObjectId.isValid(String(id)))
+    .map((id) => new mongoose.Types.ObjectId(String(id)));
+}
 
 async function list(query = {}, currentUser = null) {
   const { page, pageSize, skip } = buildPagination(query);
@@ -59,7 +68,6 @@ async function getById(id) {
 
 function formatEngineerRole(eng) {
   const name = eng?.name || '';
-  if (eng?.adminType === 'COMPLAINT_COORDINATOR') return 'Complaint Coordinator';
   if (name.includes('Railway S&T')) return 'Railway S&T Specialist';
   if (name.includes('Field Service')) return 'Field Service Specialist';
   if (name.includes('Commissioning Lead')) return 'Commissioning Lead';
@@ -71,15 +79,16 @@ function formatEngineerRole(eng) {
 async function fetchEngineersList(currentUser) {
   if (currentUser?.role === 'User') return [];
   const permDocs = await Permission.find({ complaints: true }).select('user');
-  const allowedUserIds = permDocs.map((p) => String(p.user));
+  const allowedUserIds = toValidObjectIds(permDocs.map((p) => p?.user));
   const filter = {
     status: 'active',
     isDeleted: { $ne: true },
+    role: { $ne: 'Admin' },
+    adminType: { $nin: ['SUPER_ADMIN', 'COMPLAINT_COORDINATOR', 'SALES_COORDINATOR', 'TENDER_COORDINATOR'] },
     jobRole: { $ne: 'SALESPERSON' },
-    adminType: { $nin: ['SUPER_ADMIN', 'SALES_COORDINATOR', 'TENDER_COORDINATOR'] },
   };
   if (allowedUserIds.length > 0) {
-    filter.$or = [{ _id: { $in: allowedUserIds } }, { adminType: 'COMPLAINT_COORDINATOR' }];
+    filter._id = { $in: allowedUserIds };
   }
   return User.find(filter).select('name email mobileNumber phone jobRole adminType').sort({ name: 1 });
 }
@@ -141,7 +150,10 @@ async function getDashboardMetrics(currentUser = null) {
   ]);
   const [newTicketsCount, totalOpenCount, assignedCount, inProgressCount, waitingCustomerCount, waitingPartCount, resolvedCount, closedCount, overdueCount, upcomingCount, unassignedCount] = counts;
 
-  const activeTickets = await complaintRepository.find({ assignedTo: { $in: engineers.map((e) => e._id) } }, { select: 'assignedTo status' });
+  const engineerIds = toValidObjectIds(engineers);
+  const activeTickets = engineerIds.length > 0
+    ? await complaintRepository.find({ assignedTo: { $in: engineerIds } }, { select: 'assignedTo status' })
+    : [];
   const myTicketsCount = currentUser?.role === 'User'
     ? await complaintRepository.countDocuments({ assignedTo: currentUser._id })
     : activeTickets.filter((t) => String(t.assignedTo) === String(currentUser?._id)).length;
@@ -173,7 +185,7 @@ async function checkDuplicate({ phone, serialNumber }) {
 
 async function getAssignees() {
   const permDocs = await Permission.find({ complaints: true }).select('user');
-  const allowedUserIds = permDocs.map((p) => p.user);
+  const allowedUserIds = toValidObjectIds(permDocs.map((p) => p?.user));
   const filter = { status: 'active', isDeleted: { $ne: true }, role: ROLES.USER, jobRole: { $ne: JOB_ROLES.SALESPERSON } };
   if (allowedUserIds.length > 0) filter._id = { $in: allowedUserIds };
 

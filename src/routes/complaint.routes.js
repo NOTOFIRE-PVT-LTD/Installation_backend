@@ -33,7 +33,7 @@ router.get('/check-duplicate', complaintController.checkDuplicate);
 router.get('/assignees', complaintController.assignees);
 
 router.get('/', complaintController.list);
-router.post('/', complaintController.createInternal);
+router.post('/', uploadComplaintPhotos, complaintController.createInternal);
 
 router.get('/:id', complaintController.getById);
 router.patch('/:id', complaintController.update);

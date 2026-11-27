@@ -22,6 +22,7 @@ const {
 } = require('../utils/roles');
 
 const { buildUserFilter } = require('./userFilter.service');
+const { canImpersonateUsers } = require('../utils/portalAccess');
 const ALLOWED_SORT_FIELDS = ['name', 'email', 'role', 'status', 'createdAt'];
 
 async function list(query, actor) {
@@ -109,6 +110,14 @@ async function create(data, file, actor) {
   const existing = await userRepository.findOne({ email: data.email.toLowerCase() });
   if (existing) throw new ApiError(409, 'A user with this email already exists');
 
+  const mobileDigits = String(data.mobileNumber || '').replace(/\D/g, '').slice(-10);
+  if (mobileDigits) {
+    const phoneTaken = await userRepository.findOne({ mobileNumber: mobileDigits });
+    if (phoneTaken) {
+      throw new ApiError(409, 'A user with this mobile number already exists');
+    }
+  }
+
   let profileImage = { url: null, publicId: null };
   if (file) {
     profileImage = await uploadService.uploadImageBuffer(file.buffer);
@@ -118,7 +127,7 @@ async function create(data, file, actor) {
     name: data.name,
     email: data.email,
     password: data.password,
-    mobileNumber: data.mobileNumber,
+    mobileNumber: mobileDigits || data.mobileNumber || '',
     role,
     adminType: role === ROLES.ADMIN ? adminType : undefined,
     appSuperAdmin,
@@ -178,9 +187,22 @@ async function update(id, data, file, actorId) {
   }
 
   const updates = { updatedBy: actorId };
-  ['name', 'mobileNumber', 'adminType', 'jobRole', 'gender'].forEach((field) => {
+  ['name', 'adminType', 'jobRole', 'gender'].forEach((field) => {
     if (data[field] !== undefined) updates[field] = data[field];
   });
+  if (data.mobileNumber !== undefined) {
+    const digits = String(data.mobileNumber || '').replace(/\D/g, '').slice(-10);
+    if (digits) {
+      const taken = await userRepository.findOne({
+        mobileNumber: digits,
+        _id: { $ne: id },
+      });
+      if (taken) throw new ApiError(409, 'A user with this mobile number already exists');
+      updates.mobileNumber = digits;
+    } else {
+      updates.mobileNumber = '';
+    }
+  }
 
   if (data.role && data.role !== user.role) {
     updates.role = data.role;
@@ -309,7 +331,16 @@ async function updatePermissions(id, updates, actorId) {
   return getById(id);
 }
 
-async function impersonate(id) {
+async function impersonate(id, actor) {
+  if (
+    !canImpersonateUsers(actor?.email, {
+      adminType: actor?.adminType,
+      portalSource: actor?.portalSource,
+    })
+  ) {
+    throw new ApiError(403, 'Only dual-app super admins can log in as another user');
+  }
+
   const user = await userRepository.findByIdWithPermissions(id);
   if (!user) throw new ApiError(404, 'User not found');
   if (user.status === USER_STATUS.INACTIVE) {
@@ -330,9 +361,22 @@ async function updateOwnProfile(userId, data, file) {
   if (!user) throw new ApiError(404, 'User not found');
 
   const updates = {};
-  ['name', 'mobileNumber'].forEach((field) => {
-    if (data[field] !== undefined) updates[field] = data[field];
-  });
+  if (data.name !== undefined) updates.name = data.name;
+
+  // Allow add / change / clear phone for WhatsApp login (all users).
+  if (data.mobileNumber !== undefined) {
+    const digits = String(data.mobileNumber || '').replace(/\D/g, '').slice(-10);
+    if (digits) {
+      const taken = await userRepository.findOne({
+        mobileNumber: digits,
+        _id: { $ne: userId },
+      });
+      if (taken) throw new ApiError(400, 'This mobile number is already linked to another account');
+      updates.mobileNumber = digits;
+    } else {
+      updates.mobileNumber = '';
+    }
+  }
 
   if (file) {
     if (user.profileImage?.publicId) {

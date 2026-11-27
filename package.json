@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
-    "test": "node --test src/utils/customerNormalize.test.js src/utils/geo.test.js src/utils/visitStatus.test.js src/utils/attendanceClassify.test.js src/utils/travelKm.test.js src/utils/complaint.test.js src/utils/passwordReuse.test.js",
+    "test": "node --test src/utils/customerNormalize.test.js src/utils/geo.test.js src/utils/visitStatus.test.js src/utils/attendanceClassify.test.js src/utils/travelKm.test.js src/utils/complaint.test.js src/utils/passwordReuse.test.js src/utils/migratedApp.test.js src/utils/portalAccess.test.js",
     "seed": "node src/scripts/seed.js",
     "migrate:products": "node src/scripts/migrateProducts.js",
     "migrate:parties": "node src/scripts/migrateParties.js",
@@ -42,7 +42,8 @@
     "morgan": "^1.10.0",
     "multer": "^2.0.0",
     "nodemailer": "^9.0.3",
-    "pg": "^8.23.1"
+    "pg": "^8.23.1",
+    "ws": "^8.23.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.7"

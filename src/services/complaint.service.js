@@ -31,8 +31,8 @@ class ComplaintService {
     return complaintCreationService.createPublic(data, files);
   }
 
-  async createInternal(data, currentUser) {
-    return complaintCreationService.createInternal(data, currentUser);
+  async createInternal(data, currentUser, files = []) {
+    return complaintCreationService.createInternal(data, currentUser, files);
   }
 
   async acknowledge(id, currentUser) {

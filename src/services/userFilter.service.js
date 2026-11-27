@@ -10,6 +10,9 @@ function getActorAllowedApps(actor) {
   if (actor.adminType === ADMIN_TYPES.TENDER_COORDINATOR) return ['tenders'];
 
   const perms = actor.permissions?._doc || actor.permissions || {};
+  if (perms.salesTravelRequests && !perms.tenders && !perms.attendance && !perms.complaints) {
+    return ['salesTravelRequests'];
+  }
   const allowed = PERMISSION_KEYS.filter((k) => Boolean(perms[k]));
   if (perms.salespersonTracking || perms.contractorAttendance) allowed.push('attendance');
   return Array.from(new Set(allowed));
@@ -111,18 +114,28 @@ async function buildUserFilter(query, actor) {
   const filter = buildBaseRoleFilter(query);
   appendSearchFilter(filter, query.search);
 
-  // Actor app restriction and query app filter
-  const actorApps = getActorAllowedApps(actor);
-  const targetApps = resolveTargetApps(query.apps, actorApps);
+  // Attendance People staff roster: salesperson + attendance-app admin only.
+  // Do not use permission-flag matching here — leftover cross-app flags / SUPER_ADMIN
+  // all-true perms were pulling other-app users (e.g. Ashish) into the list.
+  if (query.scope === 'attendance') {
+    appendClause(filter, {
+      $or: [
+        { role: ROLES.USER, jobRole: JOB_ROLES.SALESPERSON },
+        { role: ROLES.ADMIN, adminType: ADMIN_TYPES.SALES_COORDINATOR },
+      ],
+    });
+  } else {
+    const actorApps = getActorAllowedApps(actor);
+    const targetApps = resolveTargetApps(query.apps, actorApps);
 
-  if (targetApps) {
-    if (!targetApps.length) {
-      // Actor has no allowed apps or intersection is empty -> match none
-      filter._id = { $in: [] };
-      return filter;
+    if (targetApps) {
+      if (!targetApps.length) {
+        filter._id = { $in: [] };
+        return filter;
+      }
+      const appsClause = await buildAppsClause(targetApps);
+      appendClause(filter, appsClause);
     }
-    const appsClause = await buildAppsClause(targetApps);
-    appendClause(filter, appsClause);
   }
 
   // Non–Super Admins never see Super Admins

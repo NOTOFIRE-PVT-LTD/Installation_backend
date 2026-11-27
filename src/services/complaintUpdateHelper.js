@@ -93,6 +93,11 @@ async function update(id, data, currentUser) {
   await applyAssignedUpdate(complaint, data, currentUser, changes, now);
   await applyStatusUpdate(complaint, data, currentUser, changes, now);
 
+  if (Array.isArray(data.photos)) {
+    complaint.photos = data.photos;
+    changes.push(`Photos updated (${data.photos.length})`);
+  }
+
   if (data.resolutionNotes !== undefined && data.resolutionNotes !== complaint.resolutionNotes) {
     changes.push('Resolution Notes updated');
     complaint.resolutionNotes = data.resolutionNotes;
