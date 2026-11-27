@@ -71,11 +71,14 @@ const env = {
   cookie: {
     secret: process.env.COOKIE_SECRET,
     refreshTokenName: process.env.REFRESH_TOKEN_COOKIE_NAME || 'refreshToken',
-    // Cross-site Vercel frontend ↔ backend needs SameSite=None + Secure
+    // Cross-site Vercel frontend ↔ backend needs SameSite=None + Secure.
+    // Same-host EC2 (http://IP/ws + /ws-api) must use Secure=false + Lax.
     secure: process.env.COOKIE_SECURE
       ? process.env.COOKIE_SECURE === 'true'
       : isProduction,
     sameSite: process.env.COOKIE_SAME_SITE || (isProduction ? 'none' : 'lax'),
+    // Public URL path for Set-Cookie (local /api/auth; EC2 nginx /ws-api/auth).
+    path: process.env.AUTH_COOKIE_PATH || '/api/auth',
   },
 
   cloudinary: {

@@ -36,13 +36,18 @@ async function ensureMongoUserFromPnl({ email, name, password }) {
       email: String(email).toLowerCase().trim(),
       password,
       mobileNumber: digits.length === 10 ? digits : `9${Date.now().toString().slice(-9)}`,
-      role: ROLES.ADMIN,
-      adminType: ADMIN_TYPES.GENERAL_ADMIN,
+      role: ROLES.USER,
+      adminType: undefined,
+      portalSource: 'pnl',
       status: USER_STATUS.ACTIVE,
     });
   } else {
     user.password = password;
     if (name && !user.name) user.name = name;
+    // Keep existing Workspace accounts; only tag brand-new P&L shadows as pnl.
+    if (!user.portalSource && user.adminType !== ADMIN_TYPES.SUPER_ADMIN) {
+      // leave portalSource unset for pre-existing workspace users
+    }
   }
   await user.save();
   return userRepository.findByEmailWithPassword(user.email);
@@ -259,12 +264,16 @@ async function loginWithOtp({ phone, code }, meta) {
     if (!pnl?.email) {
       throw new ApiError(403, 'No account for this mobile number. Use email login or ask an admin.');
     }
-    user = await ensureMongoUserFromPnl({
-      email: pnl.email,
-      name: pnl.name,
-      password: `otp-${digits}-${Date.now()}`,
-    });
-    if (user && digits) {
+    // Prefer existing Workspace account by email over creating a P&L shadow.
+    user = await User.findOne({ email: String(pnl.email).toLowerCase() }).populate('permissions');
+    if (!user) {
+      user = await ensureMongoUserFromPnl({
+        email: pnl.email,
+        name: pnl.name,
+        password: `otp-${digits}-${Date.now()}`,
+      });
+    }
+    if (user && digits && user.mobileNumber !== digits) {
       user.mobileNumber = digits;
       await user.save({ validateModifiedOnly: true });
     }

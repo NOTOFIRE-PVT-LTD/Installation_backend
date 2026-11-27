@@ -7,7 +7,8 @@ function refreshCookieOptions() {
     secure: env.cookie.secure,
     sameSite: env.cookie.sameSite,
     maxAge: ms(env.jwt.refreshExpiresIn),
-    path: '/api/auth',
+    // Browser path must match the public API prefix (e.g. /ws-api/auth on EC2).
+    path: env.cookie.path,
   };
 }
 

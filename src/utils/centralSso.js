@@ -64,7 +64,14 @@ function consumeCentralSsoCode(code, expectApp = 'workspace') {
  * Mint a one-time SSO code for P&L (Centralisation NextAuth consume).
  * Same HMAC shape as Price-master-sheet mintSsoCode.
  */
-function mintCentralSsoCode({ email, name, app = 'pnl', ttlSeconds = 300 }) {
+function mintCentralSsoCode({
+  email,
+  name,
+  app = 'pnl',
+  ttlSeconds = 300,
+  accountRole,
+  designations,
+}) {
   pruneUsed();
   const claims = {
     v: 1,
@@ -74,6 +81,8 @@ function mintCentralSsoCode({ email, name, app = 'pnl', ttlSeconds = 300 }) {
     app,
     exp: Math.floor(Date.now() / 1000) + ttlSeconds,
   };
+  if (accountRole) claims.accountRole = accountRole;
+  if (Array.isArray(designations)) claims.designations = designations;
   const payloadB64 = Buffer.from(JSON.stringify(claims)).toString('base64url');
   return `${payloadB64}.${sign(payloadB64)}`;
 }

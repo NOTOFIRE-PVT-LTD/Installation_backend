@@ -1,5 +1,8 @@
+/** Server-side calls (OTP) — prefer loopback so nginx path layout cannot break proxy. */
 function pnlBase() {
-  return String(process.env.PNL_PUBLIC_URL || 'http://localhost:3000').replace(/\/$/, '');
+  return String(
+    process.env.PNL_INTERNAL_URL || process.env.PNL_PUBLIC_URL || 'http://localhost:3000',
+  ).replace(/\/$/, '');
 }
 
 async function requestPnlOtp(phone) {
