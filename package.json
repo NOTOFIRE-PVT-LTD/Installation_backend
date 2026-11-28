@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
-    "test": "node --test src/utils/customerNormalize.test.js src/utils/geo.test.js src/utils/visitStatus.test.js src/utils/attendanceClassify.test.js src/utils/travelKm.test.js src/utils/complaint.test.js src/utils/passwordReuse.test.js src/utils/migratedApp.test.js src/utils/portalAccess.test.js",
+    "test": "node --test src/utils/customerNormalize.test.js src/utils/geo.test.js src/utils/visitStatus.test.js src/utils/attendanceClassify.test.js src/utils/travelKm.test.js src/utils/complaint.test.js src/utils/passwordReuse.test.js src/utils/migratedApp.test.js src/utils/portalAccess.test.js src/utils/payflowAmounts.test.js src/services/payflowBulkStatus.service.test.js",
     "seed": "node src/scripts/seed.js",
     "migrate:products": "node src/scripts/migrateProducts.js",
     "migrate:parties": "node src/scripts/migrateParties.js",

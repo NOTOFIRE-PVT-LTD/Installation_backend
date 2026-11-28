@@ -21,6 +21,7 @@ const MODULE_MAP = [
   { prefix: '/api/nit-tenders', module: 'NIT Tenders', app: 'tenders' },
   { prefix: '/api/payments', module: 'Payments', app: 'projects' },
   { prefix: '/api/atlanta-payments', module: 'Atlanta Payments', app: 'atlantaPayments' },
+  { prefix: '/api/payflow', module: 'Payflow', app: 'payflow' },
   { prefix: '/api/quotations', module: 'Quotations', app: 'billing' },
   { prefix: '/api/proforma-invoices', module: 'Proforma Invoices', app: 'billing' },
   { prefix: '/api/delivery-challans', module: 'Delivery Challans', app: 'billing' },
@@ -101,7 +102,7 @@ function resolveAction(req, match) {
   const url = req.originalUrl || '';
   if (match?.action) return match.action;
   if (url.includes('/assign')) return 'UPDATE';
-  if (url.includes('/status')) return 'STATUS_CHANGE';
+  if (url.includes('/status') || url.includes('/bulk-status')) return 'STATUS_CHANGE';
   if (url.includes('/restore')) return 'RESTORE';
   if (url.includes('/impersonate')) return 'LOGIN';
   if (url.includes('/set-password') || url.includes('/reset-password')) return 'UPDATE';

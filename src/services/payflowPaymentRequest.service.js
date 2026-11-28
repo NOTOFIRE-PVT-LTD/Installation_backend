@@ -1,5 +1,6 @@
 const ExcelJS = require('exceljs');
 const ApiError = require('../utils/ApiError');
+const { computePayflowAmounts } = require('../utils/payflowAmounts');
 const { buildPagination, buildSort, buildPaginatedResult } = require('../utils/pagination');
 const { PayflowPaymentRequest, PayflowFund, PAYMENT_REQUEST_STATUSES } = require('../models/PayflowPaymentRequest.model');
 const { PayflowVendor } = require('../models/Payflow.model');
@@ -16,7 +17,18 @@ const STATUS_TRANSITIONS = {
   Rejected: [],
 };
 
-const SORTABLE = ['createdAt', 'srNo', 'requestDate', 'company', 'vendor', 'category', 'amount', 'status'];
+const SORTABLE = [
+  'createdAt',
+  'srNo',
+  'requestDate',
+  'company',
+  'vendor',
+  'category',
+  'totalOutstanding',
+  'amount',
+  'balanceAmount',
+  'status',
+];
 const SEARCHABLE = ['vendor', 'company', 'branch', 'category', 'subcategory', 'billNumber', 'description'];
 
 function escapeRegex(value) {
@@ -101,8 +113,11 @@ async function create(body, actor) {
     .filter((a) => a && a.url)
     .map((a) => ({ url: a.url, publicId: a.publicId || '', name: clean(a.name) || '' }));
 
-  const totalOutstanding = Number(body.totalOutstanding) || 0;
-  const amount = Number(body.amount) || 0;
+  const { totalOutstanding, amount, balanceAmount } = computePayflowAmounts({
+    totalOutstanding: body.totalOutstanding,
+    amount: body.amount,
+    payAgainst: body.payAgainst,
+  });
 
   const data = {
     company: body.company,
@@ -120,11 +135,11 @@ async function create(body, actor) {
     attachments,
     totalOutstanding,
     // Never trust a client-supplied balance.
-    balanceAmount: Math.max(totalOutstanding - amount, 0),
+    balanceAmount,
     payAgainst: body.payAgainst,
     bankName: body.bankName,
     paymentMode: body.paymentMode,
-    amount: body.amount,
+    amount,
     priority: body.priority,
     priceCheckBy: toPerson(body.priceCheckBy),
     quantityCheckedBy: toPerson(body.quantityCheckedBy),

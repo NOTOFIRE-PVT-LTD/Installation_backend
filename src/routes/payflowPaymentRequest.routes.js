@@ -34,8 +34,14 @@ const createRules = [
   personRule('quantityCheckedBy', 'Quantity checked by'),
   personRule('qualityCheckedBy', 'Quality checked by'),
   personRule('purchaseOwner', 'Purchase owner'),
-  body('amount').isFloat({ min: 0 }).withMessage('Amount must be a positive number').toFloat(),
-  body('totalOutstanding').optional({ values: 'falsy' }).isFloat({ min: 0 }).toFloat(),
+  body('amount').isFloat({ gt: 0 }).withMessage('Payment amount must be greater than 0').toFloat(),
+  body('totalOutstanding')
+    .exists({ values: 'null' })
+    .notEmpty()
+    .withMessage('Total outstanding amount is required')
+    .isFloat({ min: 0 })
+    .withMessage('Total outstanding amount must be 0 or greater')
+    .toFloat(),
   body('cpp').optional({ values: 'falsy' }).isFloat({ min: 0 }).withMessage('CPP must be a number of days'),
   body('priority').optional().isIn(PAYMENT_PRIORITIES).withMessage('Invalid priority'),
   body('bills').isArray({ min: 1 }).withMessage('At least one bill is required'),
@@ -47,6 +53,13 @@ const createRules = [
 
 const statusRules = [
   idParam,
+  body('status').isIn(PAYMENT_REQUEST_STATUSES).withMessage('Invalid status'),
+  body('remark').optional().isString().isLength({ max: 500 }),
+];
+
+const bulkStatusRules = [
+  body('ids').isArray({ min: 1, max: 10 }).withMessage('Select between 1 and 10 payment requests'),
+  body('ids.*').isMongoId().withMessage('Invalid payment request id'),
   body('status').isIn(PAYMENT_REQUEST_STATUSES).withMessage('Invalid status'),
   body('remark').optional().isString().isLength({ max: 500 }),
 ];
@@ -70,6 +83,7 @@ router.post(
   controller.addFund
 );
 router.get('/user-options', controller.userOptions);
+router.patch('/bulk-status', adminOnly, validate(bulkStatusRules), controller.bulkChangeStatus);
 router.get('/', validate(listRules), controller.list);
 router.post('/', validate(createRules), controller.create);
 router.get('/:id', validate([idParam]), controller.getById);

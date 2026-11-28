@@ -1,6 +1,13 @@
 const service = require('../services/payflowPaymentRequest.service');
+const bulkStatusService = require('../services/payflowBulkStatus.service');
 const asyncHandler = require('../utils/asyncHandler');
 const { sendSuccess } = require('../utils/ApiResponse');
+
+function formatBulkStatusMessage(result) {
+  const noun = result.updatedCount === 1 ? 'payment request' : 'payment requests';
+  const suffix = result.skippedCount > 0 ? ` (${result.skippedCount} skipped)` : '';
+  return `${result.updatedCount} ${noun} marked as ${result.status}${suffix}`;
+}
 
 // Payflow users (non-admin) only ever see requests they submitted themselves.
 const scopeOf = (req) => (req.payflowAccess === 'user' ? { ownerId: req.user._id } : {});
@@ -41,6 +48,10 @@ module.exports = {
   changeStatus: asyncHandler(async (req, res) => {
     const doc = await service.changeStatus(req.params.id, req.body, req.user);
     sendSuccess(res, { message: `Payment request marked as ${doc.status}`, data: { ...doc.toObject(), allowedStatuses: service.STATUS_TRANSITIONS[doc.status] } });
+  }),
+  bulkChangeStatus: asyncHandler(async (req, res) => {
+    const result = await bulkStatusService.bulkChangeStatus(req.body, req.user);
+    sendSuccess(res, { message: formatBulkStatusMessage(result), data: result });
   }),
   moveToTrash: asyncHandler(async (req, res) => {
     const doc = await service.moveToTrash(req.params.id, req.user);
