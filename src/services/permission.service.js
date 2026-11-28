@@ -6,11 +6,8 @@ const { isSuperAdmin, adminHasPermission } = require('../utils/roles');
 // role that gets every key. Prevents attendance/complaints/projects admins from mixing apps.
 const DEFAULT_INSTALLER_MODULES = ['projects', 'reports', 'cadDrawing', 'customers', 'attendance'];
 const INSTALLER_PERMISSION_KEYS = [
-
   'projects',
-
   'reports',
-
   'cadDrawing',
   'customers',
   'attendance',
@@ -23,10 +20,7 @@ const INSTALLER_PERMISSION_KEYS = [
   'shipping',
   'importControl',
   'contractorAttendance',
-  ,
-  'payflowUser',
-  'salesTravelRequests',
-  'salesTravelRequestsOwnOnly',
+  'leadTrack',
 ];
 
 function serializePermissions(user) {
@@ -44,7 +38,9 @@ function serializePermissions(user) {
 
   // Installers default to full access for their workspace modules until an Admin explicitly
   // restricts them. Modules like atlantaPayments default to false unless explicitly granted.
-  if (!user.permissions) return DEFAULT_INSTALLER_MODULES.reduce((acc, key) => ({ ...acc, [key]: true }), {});
+  if (!user.permissions) {
+    return DEFAULT_INSTALLER_MODULES.reduce((acc, key) => ({ ...acc, [key]: true }), {});
+  }
   const perm = user.permissions._doc || user.permissions;
   return INSTALLER_PERMISSION_KEYS.reduce((acc, key) => {
     if (DEFAULT_INSTALLER_MODULES.includes(key)) {
@@ -84,4 +80,9 @@ async function updatePermissions(userId, updates, actorId, keys = PERMISSION_KEY
   return permissionRepository.updateById(permissionDoc._id, { ...filtered, updatedBy: actorId });
 }
 
-module.exports = { serializePermissions, createDefaultPermissions, updatePermissions, INSTALLER_PERMISSION_KEYS };
+module.exports = {
+  serializePermissions,
+  createDefaultPermissions,
+  updatePermissions,
+  INSTALLER_PERMISSION_KEYS,
+};

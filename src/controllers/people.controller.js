@@ -3,7 +3,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const { sendSuccess } = require('../utils/ApiResponse');
 
 const list = asyncHandler(async (req, res) => {
-  const result = await peopleService.list(req.query);
+  const result = await peopleService.list(req.query, req.user);
   sendSuccess(res, { message: 'Salespeople fetched', data: result.items, meta: result });
 });
 

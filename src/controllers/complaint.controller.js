@@ -60,7 +60,7 @@ const assignees = asyncHandler(async (req, res) => {
 });
 
 const createInternal = asyncHandler(async (req, res) => {
-  const complaint = await complaintService.createInternal(req.body, req.user);
+  const complaint = await complaintService.createInternal(req.body, req.user, req.files);
   sendSuccess(res, {
     statusCode: 201,
     message: 'Internal complaint intake created successfully',

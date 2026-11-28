@@ -12,14 +12,21 @@ const SALESPERSON_PERMS = {
   atlantaPayments: false,
 };
 
-async function list(query) {
+async function list(query, actor) {
+  // Attendance People = salespeople + this-app admins only (not other-app / global users).
   if (query.role === ROLES.USER) {
-    return userService.list({ ...query, role: ROLES.USER, jobRole: JOB_ROLES.SALESPERSON });
+    return userService.list(
+      { ...query, role: ROLES.USER, jobRole: JOB_ROLES.SALESPERSON },
+      actor
+    );
   }
   if (query.role === ROLES.ADMIN) {
-    return userService.list({ ...query, role: ROLES.ADMIN, adminType: ADMIN_TYPES.SALES_COORDINATOR });
+    return userService.list(
+      { ...query, role: ROLES.ADMIN, adminType: ADMIN_TYPES.SALES_COORDINATOR },
+      actor
+    );
   }
-  return userService.list({ ...query, scope: 'attendance' });
+  return userService.list({ ...query, scope: 'attendance' }, actor);
 }
 
 async function create(data, actor) {

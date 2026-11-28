@@ -22,7 +22,10 @@ async function uploadFiles(files) {
   } catch (uploadErr) {
     console.warn('[ComplaintService] Photo upload skipped:', uploadErr.message);
   }
-  return [];
+  return files.map((file) => ({
+    url: `data:${file.mimetype || 'image/jpeg'};base64,${file.buffer.toString('base64')}`,
+    publicId: null,
+  }));
 }
 
 function computeWarrantyStatus(data) {
@@ -105,7 +108,7 @@ async function notifyIntakeAssign(complaint, assignedTo, isStaffUser, currentUse
   }
 }
 
-async function createInternal(data, currentUser) {
+async function createInternal(data, currentUser, files = []) {
   const customerName = String(data.customerName || '').trim();
   const contactNumber = String(data.contactNumber || data.customerPhone || '').trim();
   const whatsappNumber = String(data.whatsappNumber || data.whatsappMobile || contactNumber || '').trim();
@@ -128,6 +131,10 @@ async function createInternal(data, currentUser) {
     { now, dueAt: dueAtFor(priority, now) },
     { warrantyStatus: computeWarrantyStatus(data), currentUser, isStaffUser }
   );
+
+  const uploadedPhotos = await uploadFiles(files);
+  const existingPhotos = Array.isArray(data.photos) ? data.photos : [];
+  payload.photos = [...existingPhotos, ...uploadedPhotos];
 
   const complaint = await complaintRepository.create(payload);
   await notifyTicketCreated(complaint);

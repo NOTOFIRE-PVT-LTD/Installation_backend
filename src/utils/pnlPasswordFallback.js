@@ -48,4 +48,4 @@ async function verifyPnlPassword(email, password) {
   }
 }
 
-module.exports = { verifyPnlPassword };
+module.exports = { verifyPnlPassword, getPool };

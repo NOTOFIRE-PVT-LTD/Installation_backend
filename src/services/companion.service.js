@@ -2,6 +2,27 @@ const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 const ApiError = require('../utils/ApiError');
 
+/** Node <22 has no global WebSocket; Supabase needs `ws` or it throws on createClient. */
+function realtimeTransport() {
+  try {
+    // eslint-disable-next-line global-require, import/no-extraneous-dependencies
+    return require('ws');
+  } catch {
+    return undefined;
+  }
+}
+
+function createAdminClient(url, serviceKey) {
+  const transport = realtimeTransport();
+  if (transport && typeof globalThis.WebSocket === 'undefined') {
+    globalThis.WebSocket = transport;
+  }
+  return createClient(url, serviceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    ...(transport ? { realtime: { transport } } : {}),
+  });
+}
+
 const APPS = {
   shipping: {
     url: process.env.SHIPPING_SUPABASE_URL,
@@ -93,9 +114,7 @@ async function openSession(appKey, { email, name, asAdmin = false }) {
     throw new ApiError(503, `${appKey} is not configured on the server`);
   }
 
-  const admin = createClient(cfg.url, cfg.service, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+  const admin = createAdminClient(cfg.url, cfg.service);
 
   const user = await findOrCreateAuthUser(admin, email, name, cfg.activeField, asAdmin);
   if (asAdmin && String(user.email || '').toLowerCase() === email) {
@@ -103,9 +122,12 @@ async function openSession(appKey, { email, name, asAdmin = false }) {
     if (profile.error) throw new ApiError(500, profile.error.message);
   }
 
-  // Shipping/import only accept email+password. A magic-link token in the iframe
-  // URL is what produced "Email link is invalid or has expired".
-  const password = `Vc#${crypto.randomBytes(18).toString('base64url')}`;
+  // Shipping/import only accept email+password. Prefer a stable bridge password
+  // (COMPANION_BRIDGE_PASSWORD) so Vercel/direct login keeps working; otherwise
+  // rotate a one-shot password for this SSO handoff only.
+  const password =
+    String(process.env.COMPANION_BRIDGE_PASSWORD || '').trim() ||
+    `Vc#${crypto.randomBytes(18).toString('base64url')}`;
   const updated = await admin.auth.admin.updateUserById(user.id, {
     password,
     email_confirm: true,

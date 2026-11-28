@@ -61,7 +61,7 @@ const updatePermissions = asyncHandler(async (req, res) => {
 });
 
 const impersonate = asyncHandler(async (req, res) => {
-  const result = await userService.impersonate(req.params.id);
+  const result = await userService.impersonate(req.params.id, req.user);
   sendSuccess(res, { message: `Logged in as ${result.user.name}`, data: result });
 });
 

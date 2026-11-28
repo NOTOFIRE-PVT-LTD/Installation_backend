@@ -3,6 +3,11 @@ const ApiError = require('../utils/ApiError');
 const { resolvePortalAccess, accessCount } = require('../utils/portalAccess');
 const { mintCentralSsoCode } = require('../utils/centralSso');
 const { listPnlDirectoryUsers } = require('../utils/pnlDirectory');
+const {
+  workspaceAppsFromFlags,
+  isPlaceholderDirectoryName,
+  formatPnlRole,
+} = require('../utils/portalDirectoryApps');
 
 function pnlPublicUrl() {
   return String(process.env.PNL_PUBLIC_URL || 'http://localhost:3000').replace(/\/$/, '');
@@ -75,6 +80,8 @@ function toPortalUser(user) {
 }
 
 function roleLabel(adminType, role) {
+  if (adminType === 'GENERAL_ADMIN') return 'Admin';
+  if (adminType === 'SUPER_ADMIN') return 'Super Admin';
   if (adminType) return String(adminType).replace(/_/g, ' ');
   return role || null;
 }
@@ -127,6 +134,10 @@ async function openPnlApp(userDoc) {
   };
 }
 
+function permissionFlags(userDoc) {
+  return userDoc?.permissions?._doc || userDoc?.permissions || {};
+}
+
 /** Mint LeadTrack SSO URL — Centralisation login only; no LeadTrack signup. */
 async function openLeadTrackApp(userDoc) {
   const email = userDoc?.email;
@@ -137,8 +148,13 @@ async function openLeadTrackApp(userDoc) {
     portalSource: userDoc.portalSource,
     adminType: userDoc.adminType,
   });
-  if (!access.leadtrack && !access.workspace) {
-    throw new ApiError(403, 'No LeadTrack access');
+  const perm = permissionFlags(userDoc);
+  const granted =
+    Boolean(perm.leadTrack) ||
+    Boolean(access.leadtrack) ||
+    userDoc.adminType === 'SUPER_ADMIN';
+  if (!granted) {
+    throw new ApiError(403, 'No LeadTrack access — ask Super Admin to enable LeadTrack CRM');
   }
   const mapped = mapLeadTrackClaims(userDoc);
   const code = mintCentralSsoCode({
@@ -168,24 +184,37 @@ function upsertDirectoryRow(map, row) {
   if (access.pnl) apps.add('pnl');
   if (!apps.size) return;
 
+  const workspaceApps = [
+    ...new Set([...(existing?.workspaceApps || []), ...(row.workspaceApps || [])]),
+  ];
+  const keepWsIdentity = Boolean(existing?.workspaceId);
+  const nextName = isPlaceholderDirectoryName(row.name)
+    ? existing?.name || row.name || null
+    : row.name || existing?.name || null;
+
   map.set(email, {
     id: existing?.id || row.id,
     workspaceId: access.workspace
       ? row.workspaceId || existing?.workspaceId || null
-      : null,
-    name: row.name || existing?.name || null,
+      : existing?.workspaceId || null,
+    name: keepWsIdentity && isPlaceholderDirectoryName(row.name)
+      ? existing.name || nextName
+      : nextName,
     email,
     phone: row.phone || existing?.phone || null,
-    role: row.role || existing?.role || null,
+    // Workspace role wins when both portals share an email (P&L seed name/role is noisy).
+    role: keepWsIdentity ? existing.role || row.role : row.role || existing?.role || null,
     active: row.active !== false && (existing ? existing.active !== false : true),
     apps: Array.from(apps),
+    workspaceApps,
   });
 }
 
 async function listPortalDirectory() {
   const [wsUsers, pnlUsers] = await Promise.all([
     User.find({})
-      .select('name email mobileNumber role adminType status portalSource')
+      .select('name email mobileNumber role adminType status portalSource permissions')
+      .populate('permissions')
       .sort({ name: 1 })
       .lean(),
     listPnlDirectoryUsers(),
@@ -194,6 +223,7 @@ async function listPortalDirectory() {
   const byEmail = new Map();
 
   wsUsers.forEach((u) => {
+    const flags = u.permissions || {};
     upsertDirectoryRow(byEmail, {
       id: `ws-${u._id}`,
       workspaceId: String(u._id),
@@ -204,6 +234,7 @@ async function listPortalDirectory() {
       active: u.status !== 'inactive',
       portalSource: u.portalSource,
       adminType: u.adminType,
+      workspaceApps: workspaceAppsFromFlags(flags),
     });
   });
 
@@ -213,7 +244,7 @@ async function listPortalDirectory() {
       email: u.email,
       name: u.name,
       phone: u.phone,
-      role: u.role,
+      role: formatPnlRole(u.role),
       active: u.active,
       // P&L DB rows are P&L-only unless also a real Workspace mongo user above.
       portalSource: 'pnl',

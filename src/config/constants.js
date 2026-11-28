@@ -193,6 +193,8 @@ const PERMISSION_KEYS = Object.freeze([
   'shipping',
   'importControl',
   'contractorAttendance',
+  // Opt-in: grant LeadTrack CRM to an existing Workspace user (same login).
+  'leadTrack',
 ]);
 
 const COMPLAINT_STATUS = Object.freeze({

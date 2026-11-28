@@ -19,7 +19,9 @@ const idParam = [param('id').isMongoId().withMessage('Invalid id')];
 
 const list = [
   query('page').optional().isInt({ min: 1 }),
-  query('pageSize').optional().isInt({ min: 1, max: 100 }),
+  query('pageSize').optional().isInt({ min: 1, max: 1000 }),
+  query('active').optional(),
+  query('search').optional().isString().trim(),
   query('assignedSalesperson').optional().isMongoId(),
 ];
 
